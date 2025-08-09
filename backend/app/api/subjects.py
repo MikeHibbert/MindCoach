@@ -119,7 +119,7 @@ def select_subject(user_id, subject):
             }), 404
         
         # Check if user exists
-        user = UserService.get_user(user_id)
+        user = UserService.get_user_by_id(user_id)
         if not user:
             return jsonify({
                 'error': {
@@ -209,7 +209,7 @@ def get_subject_status(user_id, subject):
             }), 404
         
         # Check if user exists
-        user = UserService.get_user(user_id)
+        user = UserService.get_user_by_id(user_id)
         if not user:
             return jsonify({
                 'error': {
@@ -287,7 +287,7 @@ def check_subject_access(user_id, subject):
             }), 404
         
         # Check if user exists
-        user = UserService.get_user(user_id)
+        user = UserService.get_user_by_id(user_id)
         if not user:
             return jsonify({
                 'error': {

@@ -292,3 +292,25 @@ class UserDataService:
                 
         except (FileServiceError, OSError) as e:
             raise UserDataServiceError(f"Failed to delete subject data: {e}")
+    
+    @classmethod
+    def save_subject_selection(cls, user_id: str, subject: str) -> bool:
+        """Save user's subject selection to selection.json (alias for save_user_selection)"""
+        try:
+            cls.save_user_selection(user_id, subject)
+            return True
+        except UserDataServiceError:
+            return False
+    
+    @classmethod
+    def has_subject_selection(cls, user_id: str, subject: str) -> bool:
+        """Check if user has selected a specific subject"""
+        try:
+            selection_data = cls.load_user_selection(user_id)
+            if not selection_data:
+                return False
+            
+            return selection_data.get("selected_subject") == subject
+            
+        except UserDataServiceError:
+            return False

@@ -450,3 +450,46 @@ Python has several built-in data types:
         
         lesson_ids = UserDataService.get_lesson_files(user_id, subject)
         assert lesson_ids == [1, 2]
+    
+    def test_save_subject_selection_alias(self):
+        """Test save_subject_selection method (alias for save_user_selection)"""
+        user_id = "test_user_alias"
+        subject = "javascript"
+        
+        # Test successful save
+        result = UserDataService.save_subject_selection(user_id, subject)
+        assert result is True
+        
+        # Verify data was saved
+        selection = UserDataService.load_user_selection(user_id)
+        assert selection is not None
+        assert selection["selected_subject"] == subject
+        
+        # Clean up
+        UserDataService.delete_user_data(user_id)
+    
+    def test_has_subject_selection(self):
+        """Test has_subject_selection method"""
+        user_id = "test_user_has_selection"
+        subject = "python"
+        other_subject = "javascript"
+        
+        # Initially should return False
+        assert UserDataService.has_subject_selection(user_id, subject) is False
+        
+        # Save selection
+        UserDataService.save_user_selection(user_id, subject)
+        
+        # Should return True for selected subject
+        assert UserDataService.has_subject_selection(user_id, subject) is True
+        
+        # Should return False for other subject
+        assert UserDataService.has_subject_selection(user_id, other_subject) is False
+        
+        # Clean up
+        UserDataService.delete_user_data(user_id)
+    
+    def test_has_subject_selection_nonexistent_user(self):
+        """Test has_subject_selection with nonexistent user"""
+        result = UserDataService.has_subject_selection("nonexistent_user", "python")
+        assert result is False
