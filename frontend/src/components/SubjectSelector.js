@@ -1,4 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { 
+  announceToScreenReader, 
+  keyboardNavigation, 
+  ariaLabels, 
+  formAccessibility,
+  touchTargets 
+} from '../utils/accessibility';
 
 const SubjectSelector = ({ userId, onSubjectSelect }) => {
   const [subjects, setSubjects] = useState([]);
@@ -6,6 +13,13 @@ const SubjectSelector = ({ userId, onSubjectSelect }) => {
   const [viewMode, setViewMode] = useState('grid'); // 'grid' or 'dropdown'
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [focusedCardIndex, setFocusedCardIndex] = useState(-1);
+  
+  // Refs for accessibility
+  const cardRefs = useRef([]);
+  const dropdownRef = useRef(null);
+  const errorRef = useRef(null);
+  const statusRef = useRef(null);
 
   // Fetch subjects on component mount
   useEffect(() => {
@@ -39,13 +53,17 @@ const SubjectSelector = ({ userId, onSubjectSelect }) => {
 
   const handleSubjectSelect = async (subject) => {
     if (subject.locked) {
-      // Don't allow selection of locked subjects
+      // Announce that subject is locked
+      announceToScreenReader(`${subject.name} requires a subscription and cannot be selected`);
       return;
     }
 
     try {
       setError(null); // Clear any previous errors
       setSelectedSubject(subject);
+      
+      // Announce selection to screen readers
+      announceToScreenReader(`Selected ${subject.name}`);
       
       // Persist subject selection to backend if userId is provided
       if (userId) {
@@ -61,8 +79,10 @@ const SubjectSelector = ({ userId, onSubjectSelect }) => {
           
           // Handle subscription required error
           if (response.status === 402) {
-            setError(`Subscription required for ${subject.name}. ${errorData.error?.message || ''}`);
+            const errorMessage = `Subscription required for ${subject.name}. ${errorData.error?.message || ''}`;
+            setError(errorMessage);
             setSelectedSubject(null);
+            announceToScreenReader(errorMessage, 'assertive');
             return;
           }
           
@@ -71,6 +91,7 @@ const SubjectSelector = ({ userId, onSubjectSelect }) => {
 
         const data = await response.json();
         console.log('Subject selection saved:', data);
+        announceToScreenReader(`${subject.name} selection saved successfully`);
       }
       
       // Call parent callback if provided (always call it after successful selection)
@@ -79,139 +100,196 @@ const SubjectSelector = ({ userId, onSubjectSelect }) => {
       }
     } catch (err) {
       console.error('Error selecting subject:', err);
-      setError(err.message || 'Failed to select subject');
+      const errorMessage = err.message || 'Failed to select subject';
+      setError(errorMessage);
       setSelectedSubject(null);
+      announceToScreenReader(`Error: ${errorMessage}`, 'assertive');
       // Don't call onSubjectSelect callback on error
     }
   };
 
-  const SubjectCard = ({ subject, isSelected, onClick }) => (
-    <div
-      className={`
-        relative p-6 rounded-lg border-2 transition-all duration-200 cursor-pointer
-        ${subject.locked 
-          ? 'border-gray-200 bg-gray-50 cursor-not-allowed opacity-60' 
-          : isSelected
-            ? 'border-primary-500 bg-primary-50 shadow-md'
-            : 'border-gray-200 bg-white hover:border-primary-300 hover:shadow-sm'
-        }
-        ${!subject.locked ? 'focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2' : ''}
-      `}
-      onClick={() => !subject.locked && onClick(subject)}
-      onKeyDown={(e) => {
-        if ((e.key === 'Enter' || e.key === ' ') && !subject.locked) {
-          e.preventDefault();
-          onClick(subject);
-        }
-      }}
-      tabIndex={subject.locked ? -1 : 0}
-      role="button"
-      aria-pressed={isSelected}
-      aria-disabled={subject.locked}
-      aria-describedby={`subject-${subject.id}-description`}
-    >
-      {/* Lock indicator */}
-      {subject.locked && (
-        <div className="absolute top-3 right-3">
-          <svg
-            className="w-5 h-5 text-gray-400"
-            fill="currentColor"
-            viewBox="0 0 20 20"
-            aria-hidden="true"
-          >
-            <path
-              fillRule="evenodd"
-              d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z"
-              clipRule="evenodd"
-            />
-          </svg>
-        </div>
-      )}
-      
-      {/* Selection indicator */}
-      {isSelected && !subject.locked && (
-        <div className="absolute top-3 right-3">
-          <svg
-            className="w-5 h-5 text-primary-600"
-            fill="currentColor"
-            viewBox="0 0 20 20"
-            aria-hidden="true"
-          >
-            <path
-              fillRule="evenodd"
-              d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-              clipRule="evenodd"
-            />
-          </svg>
-        </div>
-      )}
+  // Handle keyboard navigation for subject cards
+  const handleCardKeyDown = (e, index) => {
+    keyboardNavigation.handleArrowKeys(
+      e,
+      subjects,
+      index,
+      (newIndex) => {
+        setFocusedCardIndex(newIndex);
+        cardRefs.current[newIndex]?.focus();
+      }
+    );
 
-      <div className="mb-3">
-        <h3 className={`text-lg font-semibold ${subject.locked ? 'text-gray-500' : 'text-gray-900'}`}>
-          {subject.name}
-        </h3>
-      </div>
-      
-      <p 
-        id={`subject-${subject.id}-description`}
-        className={`text-sm mb-4 ${subject.locked ? 'text-gray-400' : 'text-gray-600'}`}
+    // Handle activation
+    keyboardNavigation.handleActivation(e, () => {
+      handleSubjectSelect(subjects[index]);
+    });
+  };
+
+  // Generate form field IDs for accessibility
+  const dropdownFieldIds = formAccessibility.generateFieldIds('subject-dropdown');
+
+  const SubjectCard = ({ subject, isSelected, onClick, index }) => {
+    const cardId = `subject-card-${subject.id}`;
+    const descriptionId = `subject-${subject.id}-description`;
+    const statusId = `subject-${subject.id}-status`;
+    
+    return (
+      <div
+        ref={(el) => cardRefs.current[index] = el}
+        id={cardId}
+        className={`
+          relative p-6 rounded-lg border-2 transition-all duration-200 cursor-pointer touch-target
+          ${subject.locked 
+            ? 'border-gray-400 bg-gray-100 cursor-not-allowed opacity-70' 
+            : isSelected
+              ? 'border-blue-600 bg-blue-50 shadow-md'
+              : 'border-gray-300 bg-white hover:border-blue-400 hover:shadow-sm'
+          }
+          ${!subject.locked ? 'focus:outline-none focus:ring-3 focus:ring-blue-500 focus:ring-offset-2' : ''}
+        `}
+        onClick={() => !subject.locked && onClick(subject)}
+        onKeyDown={(e) => handleCardKeyDown(e, index)}
+        tabIndex={subject.locked ? -1 : 0}
+        role="button"
+        aria-pressed={isSelected}
+        aria-disabled={subject.locked}
+        aria-describedby={`${descriptionId} ${statusId}`}
+        aria-label={`${subject.name}. ${subject.description}. ${subject.locked ? 'Subscription required' : 'Available'}`}
       >
-        {subject.description}
-      </p>
-      
-      <div className="flex items-center justify-between">
-        <div className="text-sm">
-          {subject.locked ? (
-            <span className="text-gray-500 font-medium">Subscription Required</span>
-          ) : (
-            <span className="text-primary-600 font-medium">Available</span>
-          )}
+        {/* Lock indicator */}
+        {subject.locked && (
+          <div className="absolute top-3 right-3" aria-hidden="true">
+            <svg
+              className="w-6 h-6 text-gray-500"
+              fill="currentColor"
+              viewBox="0 0 20 20"
+            >
+              <path
+                fillRule="evenodd"
+                d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z"
+                clipRule="evenodd"
+              />
+            </svg>
+          </div>
+        )}
+        
+        {/* Selection indicator */}
+        {isSelected && !subject.locked && (
+          <div className="absolute top-3 right-3" aria-hidden="true">
+            <svg
+              className="w-6 h-6 text-blue-700"
+              fill="currentColor"
+              viewBox="0 0 20 20"
+            >
+              <path
+                fillRule="evenodd"
+                d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                clipRule="evenodd"
+              />
+            </svg>
+          </div>
+        )}
+
+        <div className="mb-3">
+          <h3 className={`text-lg font-semibold ${subject.locked ? 'text-gray-600' : 'text-gray-900'}`}>
+            {subject.name}
+          </h3>
         </div>
         
-        <div className="text-right">
-          <div className={`text-sm ${subject.locked ? 'text-gray-400' : 'text-gray-600'}`}>
-            From ${subject.pricing?.monthly}/month
+        <p 
+          id={descriptionId}
+          className={`text-sm mb-4 ${subject.locked ? 'text-gray-500' : 'text-gray-700'}`}
+        >
+          {subject.description}
+        </p>
+        
+        <div className="flex items-center justify-between">
+          <div className="text-sm">
+            <span 
+              id={statusId}
+              className={`font-medium ${
+                subject.locked 
+                  ? 'text-gray-600' 
+                  : 'text-blue-700'
+              }`}
+            >
+              {subject.locked ? 'Subscription Required' : 'Available'}
+            </span>
+          </div>
+          
+          <div className="text-right">
+            <div className={`text-sm ${subject.locked ? 'text-gray-500' : 'text-gray-700'}`}>
+              From ${subject.pricing?.monthly}/month
+            </div>
           </div>
         </div>
-      </div>
     </div>
   );
 
-  const SubjectDropdown = ({ subjects, selectedSubject, onSelect, id }) => (
-    <div className="relative">
-      <select
-        id={id}
-        value={selectedSubject?.id || ''}
-        onChange={(e) => {
-          const subject = subjects.find(s => s.id === e.target.value);
-          if (subject && !subject.locked) {
-            onSelect(subject);
-          }
-        }}
-        className="w-full px-4 py-3 text-base border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 bg-white min-h-[48px]"
-        aria-label="Select a programming subject"
-      >
-        <option value="">Choose a subject...</option>
-        {subjects.map((subject) => (
-          <option 
-            key={subject.id} 
-            value={subject.id}
-            disabled={subject.locked}
+  const SubjectDropdown = ({ subjects, selectedSubject, onSelect, fieldIds, labelText }) => {
+    const fieldAria = formAccessibility.getFieldAria(fieldIds, !!error, false);
+    
+    return (
+      <div className="relative">
+        <label 
+          id={fieldIds.labelId}
+          htmlFor={fieldIds.fieldId}
+          className="block text-sm font-medium text-gray-900 mb-2"
+        >
+          {labelText}
+        </label>
+        <select
+          ref={dropdownRef}
+          {...fieldAria}
+          value={selectedSubject?.id || ''}
+          onChange={(e) => {
+            const subject = subjects.find(s => s.id === e.target.value);
+            if (subject && !subject.locked) {
+              onSelect(subject);
+            } else if (subject && subject.locked) {
+              announceToScreenReader(`${subject.name} requires a subscription`, 'assertive');
+            }
+          }}
+          className={`input-field ${error ? 'input-field-error' : ''}`}
+          aria-label={ariaLabels.fieldDescription('Programming subject selection', true, 'Choose from available subjects')}
+        >
+          <option value="">Choose a subject...</option>
+          {subjects.map((subject) => (
+            <option 
+              key={subject.id} 
+              value={subject.id}
+              disabled={subject.locked}
+            >
+              {subject.name} {subject.locked ? '(Subscription Required)' : ''}
+            </option>
+          ))}
+        </select>
+        {error && (
+          <div 
+            id={fieldIds.errorId}
+            className="mt-2 text-sm text-red-700"
+            role="alert"
+            aria-live="polite"
           >
-            {subject.name} {subject.locked ? '(Subscription Required)' : ''}
-          </option>
-        ))}
-      </select>
-    </div>
-  );
+            {error}
+          </div>
+        )}
+      </div>
+    );
+  };
 
   if (loading) {
     return (
       <div className="max-w-4xl mx-auto">
         <h2 className="text-2xl font-bold text-gray-900 mb-6">Select a Subject</h2>
-        <div className="flex items-center justify-center py-12">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600" role="progressbar" aria-label="Loading"></div>
-          <span className="ml-3 text-gray-600">Loading subjects...</span>
+        <div className="flex items-center justify-center py-12" role="status" aria-live="polite">
+          <div 
+            className="loading-spinner h-8 w-8 border-blue-600" 
+            aria-hidden="true"
+          ></div>
+          <span className="ml-3 text-gray-700">Loading subjects...</span>
+          <span className="sr-only">Loading available subjects, please wait</span>
         </div>
       </div>
     );
@@ -221,10 +299,15 @@ const SubjectSelector = ({ userId, onSubjectSelect }) => {
     return (
       <div className="max-w-4xl mx-auto">
         <h2 className="text-2xl font-bold text-gray-900 mb-6">Select a Subject</h2>
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+        <div 
+          ref={errorRef}
+          className="error-message"
+          role="alert"
+          aria-live="assertive"
+        >
           <div className="flex">
             <svg
-              className="w-5 h-5 text-red-400 mt-0.5"
+              className="w-6 h-6 text-red-700 mt-0.5 flex-shrink-0"
               fill="currentColor"
               viewBox="0 0 20 20"
               aria-hidden="true"
@@ -236,11 +319,12 @@ const SubjectSelector = ({ userId, onSubjectSelect }) => {
               />
             </svg>
             <div className="ml-3">
-              <h3 className="text-sm font-medium text-red-800">Error loading subjects</h3>
-              <p className="text-sm text-red-700 mt-1">{error}</p>
+              <h3 className="text-sm font-medium text-red-900">Error loading subjects</h3>
+              <p className="text-sm text-red-800 mt-1">{error}</p>
               <button
                 onClick={fetchSubjects}
-                className="mt-3 text-sm font-medium text-red-800 hover:text-red-900 focus:outline-none focus:underline"
+                className="mt-3 btn-secondary focus:ring-red-500"
+                aria-label="Retry loading subjects"
               >
                 Try again
               </button>
@@ -300,14 +384,12 @@ const SubjectSelector = ({ userId, onSubjectSelect }) => {
 
       {/* Mobile: Always show dropdown */}
       <div className="block tablet:hidden mb-6">
-        <label htmlFor="mobile-subject-select" className="block text-sm font-medium text-gray-700 mb-2">
-          Choose a subject:
-        </label>
         <SubjectDropdown
           subjects={subjects}
           selectedSubject={selectedSubject}
           onSelect={handleSubjectSelect}
-          id="mobile-subject-select"
+          fieldIds={dropdownFieldIds}
+          labelText="Choose a subject:"
         />
       </div>
 
@@ -315,24 +397,27 @@ const SubjectSelector = ({ userId, onSubjectSelect }) => {
       <div className="hidden tablet:block">
         {viewMode === 'dropdown' ? (
           <div className="mb-6">
-            <label htmlFor="desktop-subject-select" className="block text-sm font-medium text-gray-700 mb-2">
-              Choose a subject:
-            </label>
             <SubjectDropdown
               subjects={subjects}
               selectedSubject={selectedSubject}
               onSelect={handleSubjectSelect}
-              id="desktop-subject-select"
+              fieldIds={dropdownFieldIds}
+              labelText="Choose a subject:"
             />
           </div>
         ) : (
-          <div className="grid grid-cols-1 tablet:grid-cols-2 desktop:grid-cols-3 gap-6">
-            {subjects.map((subject) => (
+          <div 
+            className="grid grid-cols-1 tablet:grid-cols-2 desktop:grid-cols-3 gap-6"
+            role="group"
+            aria-label="Available programming subjects"
+          >
+            {subjects.map((subject, index) => (
               <SubjectCard
                 key={subject.id}
                 subject={subject}
                 isSelected={selectedSubject?.id === subject.id}
                 onClick={handleSubjectSelect}
+                index={index}
               />
             ))}
           </div>
@@ -341,10 +426,15 @@ const SubjectSelector = ({ userId, onSubjectSelect }) => {
 
       {/* Selected subject confirmation */}
       {selectedSubject && (
-        <div className="mt-8 p-4 bg-primary-50 border border-primary-200 rounded-lg">
+        <div 
+          ref={statusRef}
+          className="mt-8 success-message"
+          role="status"
+          aria-live="polite"
+        >
           <div className="flex items-start">
             <svg
-              className="w-5 h-5 text-primary-600 mt-0.5 flex-shrink-0"
+              className="w-6 h-6 text-green-700 mt-0.5 flex-shrink-0"
               fill="currentColor"
               viewBox="0 0 20 20"
               aria-hidden="true"
@@ -356,10 +446,10 @@ const SubjectSelector = ({ userId, onSubjectSelect }) => {
               />
             </svg>
             <div className="ml-3">
-              <h3 className="text-sm font-medium text-primary-800">
+              <h3 className="text-sm font-medium text-green-900">
                 {selectedSubject.name} Selected
               </h3>
-              <p className="text-sm text-primary-700 mt-1">
+              <p className="text-sm text-green-800 mt-1">
                 You can now proceed to take the knowledge assessment survey.
               </p>
             </div>

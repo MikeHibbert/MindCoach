@@ -1,5 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import PropTypes from 'prop-types';
+import { 
+  announceToScreenReader, 
+  keyboardNavigation, 
+  ariaLabels, 
+  formAccessibility,
+  focusManagement 
+} from '../utils/accessibility';
 
 const Survey = ({ 
   surveyData, 
@@ -13,6 +20,12 @@ const Survey = ({
   const [answers, setAnswers] = useState({});
   const [validationErrors, setValidationErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // Refs for accessibility
+  const questionRef = useRef(null);
+  const errorRef = useRef(null);
+  const progressRef = useRef(null);
+  const optionRefs = useRef([]);
 
   // Reset state when survey data changes
   useEffect(() => {
@@ -20,8 +33,16 @@ const Survey = ({
       setCurrentQuestionIndex(0);
       setAnswers({});
       setValidationErrors({});
+      announceToScreenReader(`Survey loaded with ${surveyData.questions?.length || 0} questions`);
     }
   }, [surveyData]);
+
+  // Focus management when question changes
+  useEffect(() => {
+    if (questionRef.current) {
+      focusManagement.setFocus(questionRef.current, 100);
+    }
+  }, [currentQuestionIndex]);
 
   // Report progress to parent component
   useEffect(() => {
@@ -103,6 +124,7 @@ const Survey = ({
         delete newErrors[questionId];
         return newErrors;
       });
+      announceToScreenReader('Answer updated');
     }
   };
 
@@ -123,18 +145,37 @@ const Survey = ({
 
   const handleNext = () => {
     if (!validateCurrentQuestion()) {
+      announceToScreenReader('Please answer the current question before continuing', 'assertive');
       return;
     }
     
     if (currentQuestionIndex < totalQuestions - 1) {
       setCurrentQuestionIndex(prev => prev + 1);
+      announceToScreenReader(`Moving to question ${currentQuestionIndex + 2} of ${totalQuestions}`);
     }
   };
 
   const handlePrevious = () => {
     if (currentQuestionIndex > 0) {
       setCurrentQuestionIndex(prev => prev - 1);
+      announceToScreenReader(`Moving to question ${currentQuestionIndex} of ${totalQuestions}`);
     }
+  };
+
+  // Handle keyboard navigation for options
+  const handleOptionKeyDown = (e, optionIndex, totalOptions, onSelect) => {
+    keyboardNavigation.handleArrowKeys(
+      e,
+      Array(totalOptions).fill(null),
+      optionIndex,
+      (newIndex) => {
+        optionRefs.current[newIndex]?.focus();
+      }
+    );
+
+    keyboardNavigation.handleActivation(e, () => {
+      onSelect();
+    });
   };
 
   const handleSubmit = async () => {
@@ -192,85 +233,108 @@ const Survey = ({
     const questionId = question.id;
     const selectedAnswer = answers[questionId];
     const hasError = validationErrors[questionId];
+    const fieldIds = formAccessibility.generateFieldIds(`question-${questionId}`);
 
     switch (question.type) {
       case 'multiple_choice':
         return (
-          <div className="space-y-3">
-            {question.options.map((option, index) => (
-              <label
-                key={index}
-                className={`flex items-start p-4 border-2 rounded-lg cursor-pointer transition-all duration-200 hover:bg-gray-50 focus-within:ring-2 focus-within:ring-primary-500 focus-within:ring-offset-2 ${
-                  selectedAnswer === index
-                    ? 'border-primary-500 bg-primary-50'
-                    : hasError
-                    ? 'border-red-300'
-                    : 'border-gray-200'
-                } ${
-                  // Larger touch targets for mobile and tablet
-                  'mobile:min-h-[56px] tablet:min-h-[60px]'
-                }`}
-              >
-                <input
-                  type="radio"
-                  name={`question-${questionId}`}
-                  value={index}
-                  checked={selectedAnswer === index}
-                  onChange={() => handleAnswerChange(questionId, index)}
-                  className="mt-1 h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300"
-                  aria-describedby={hasError ? `error-${questionId}` : undefined}
-                />
-                <span className="ml-3 text-gray-900 flex-1 mobile:text-base tablet:text-lg">
-                  {option}
-                </span>
-              </label>
-            ))}
-          </div>
+          <fieldset className="space-y-3">
+            <legend className="sr-only">
+              {question.question} - Multiple choice question
+            </legend>
+            {question.options.map((option, index) => {
+              const optionId = `${fieldIds.fieldId}-option-${index}`;
+              return (
+                <label
+                  key={index}
+                  htmlFor={optionId}
+                  className={`flex items-start p-4 border-2 rounded-lg cursor-pointer transition-all duration-200 hover:bg-gray-50 focus-within:ring-3 focus-within:ring-blue-500 focus-within:ring-offset-2 touch-target-large ${
+                    selectedAnswer === index
+                      ? 'border-blue-600 bg-blue-50'
+                      : hasError
+                      ? 'border-red-400'
+                      : 'border-gray-300'
+                  }`}
+                >
+                  <input
+                    ref={(el) => optionRefs.current[index] = el}
+                    id={optionId}
+                    type="radio"
+                    name={`question-${questionId}`}
+                    value={index}
+                    checked={selectedAnswer === index}
+                    onChange={() => handleAnswerChange(questionId, index)}
+                    onKeyDown={(e) => handleOptionKeyDown(e, index, question.options.length, () => handleAnswerChange(questionId, index))}
+                    className="mt-1 h-5 w-5 text-blue-600 focus:ring-blue-500 border-gray-400"
+                    aria-describedby={hasError ? `error-${questionId}` : undefined}
+                  />
+                  <span className="ml-3 text-gray-900 flex-1 mobile:text-base tablet:text-lg">
+                    {option}
+                  </span>
+                </label>
+              );
+            })}
+          </fieldset>
         );
 
       case 'true_false':
         return (
-          <div className="space-y-3">
-            {['True', 'False'].map((option, index) => (
-              <label
-                key={index}
-                className={`flex items-center p-4 border-2 rounded-lg cursor-pointer transition-all duration-200 hover:bg-gray-50 focus-within:ring-2 focus-within:ring-primary-500 focus-within:ring-offset-2 ${
-                  selectedAnswer === index
-                    ? 'border-primary-500 bg-primary-50'
-                    : hasError
-                    ? 'border-red-300'
-                    : 'border-gray-200'
-                } mobile:min-h-[56px] tablet:min-h-[60px]`}
-              >
-                <input
-                  type="radio"
-                  name={`question-${questionId}`}
-                  value={index}
-                  checked={selectedAnswer === index}
-                  onChange={() => handleAnswerChange(questionId, index)}
-                  className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300"
-                  aria-describedby={hasError ? `error-${questionId}` : undefined}
-                />
-                <span className="ml-3 text-gray-900 mobile:text-base tablet:text-lg">
-                  {option}
-                </span>
-              </label>
-            ))}
-          </div>
+          <fieldset className="space-y-3">
+            <legend className="sr-only">
+              {question.question} - True or false question
+            </legend>
+            {['True', 'False'].map((option, index) => {
+              const optionId = `${fieldIds.fieldId}-option-${index}`;
+              return (
+                <label
+                  key={index}
+                  htmlFor={optionId}
+                  className={`flex items-center p-4 border-2 rounded-lg cursor-pointer transition-all duration-200 hover:bg-gray-50 focus-within:ring-3 focus-within:ring-blue-500 focus-within:ring-offset-2 touch-target-large ${
+                    selectedAnswer === index
+                      ? 'border-blue-600 bg-blue-50'
+                      : hasError
+                      ? 'border-red-400'
+                      : 'border-gray-300'
+                  }`}
+                >
+                  <input
+                    ref={(el) => optionRefs.current[index] = el}
+                    id={optionId}
+                    type="radio"
+                    name={`question-${questionId}`}
+                    value={index}
+                    checked={selectedAnswer === index}
+                    onChange={() => handleAnswerChange(questionId, index)}
+                    onKeyDown={(e) => handleOptionKeyDown(e, index, 2, () => handleAnswerChange(questionId, index))}
+                    className="h-5 w-5 text-blue-600 focus:ring-blue-500 border-gray-400"
+                    aria-describedby={hasError ? `error-${questionId}` : undefined}
+                  />
+                  <span className="ml-3 text-gray-900 mobile:text-base tablet:text-lg">
+                    {option}
+                  </span>
+                </label>
+              );
+            })}
+          </fieldset>
         );
 
       case 'text':
+        const textFieldAria = formAccessibility.getFieldAria(fieldIds, hasError, false);
         return (
           <div>
+            <label htmlFor={fieldIds.fieldId} className="sr-only">
+              {question.question} - Text answer
+            </label>
             <textarea
+              {...textFieldAria}
               value={selectedAnswer || ''}
               onChange={(e) => handleAnswerChange(questionId, e.target.value)}
               placeholder="Enter your answer here..."
               rows={4}
               className={`input-field resize-none mobile:text-base tablet:text-lg ${
-                hasError ? 'border-red-300 focus:ring-red-500' : ''
+                hasError ? 'input-field-error' : ''
               }`}
-              aria-describedby={hasError ? `error-${questionId}` : undefined}
+              aria-label={ariaLabels.fieldDescription('Text answer', true, 'Provide a detailed response')}
             />
           </div>
         );
@@ -316,25 +380,33 @@ const Survey = ({
         {/* Question Header */}
         <div className="mb-6">
           <div className="flex items-start justify-between mb-4">
-            <h3 className="text-lg font-semibold text-gray-900 flex-1 mobile:text-base tablet:text-lg">
+            <h3 
+              ref={questionRef}
+              className="text-lg font-semibold text-gray-900 flex-1 mobile:text-base tablet:text-lg"
+              tabIndex="-1"
+              id={`question-${currentQuestion.id}-title`}
+            >
               {currentQuestion.question}
             </h3>
             {currentQuestion.difficulty && (
-              <span className={`ml-4 px-2 py-1 text-xs font-medium rounded-full flex-shrink-0 ${
-                currentQuestion.difficulty === 'beginner'
-                  ? 'bg-green-100 text-green-800'
-                  : currentQuestion.difficulty === 'intermediate'
-                  ? 'bg-yellow-100 text-yellow-800'
-                  : 'bg-red-100 text-red-800'
-              }`}>
+              <span 
+                className={`ml-4 px-2 py-1 text-xs font-medium rounded-full flex-shrink-0 ${
+                  currentQuestion.difficulty === 'beginner'
+                    ? 'bg-green-100 text-green-800'
+                    : currentQuestion.difficulty === 'intermediate'
+                    ? 'bg-yellow-100 text-yellow-800'
+                    : 'bg-red-100 text-red-800'
+                }`}
+                aria-label={`Difficulty level: ${currentQuestion.difficulty}`}
+              >
                 {currentQuestion.difficulty}
               </span>
             )}
           </div>
           
           {currentQuestion.topic && (
-            <div className="text-sm text-gray-500 mb-4">
-              Topic: {currentQuestion.topic.replace('_', ' ')}
+            <div className="text-sm text-gray-600 mb-4">
+              <span className="font-medium">Topic:</span> {currentQuestion.topic.replace('_', ' ')}
             </div>
           )}
         </div>
@@ -346,11 +418,13 @@ const Survey = ({
           {/* Validation Error */}
           {validationErrors[currentQuestion.id] && (
             <div 
+              ref={errorRef}
               id={`error-${currentQuestion.id}`}
-              className="mt-3 text-sm text-red-600 flex items-center"
+              className="mt-3 text-sm text-red-800 flex items-center bg-red-50 border border-red-200 rounded-lg p-3"
               role="alert"
+              aria-live="assertive"
             >
-              <svg className="h-4 w-4 mr-2 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+              <svg className="h-5 w-5 mr-2 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
                 <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
               </svg>
               {validationErrors[currentQuestion.id]}
@@ -359,17 +433,18 @@ const Survey = ({
         </div>
 
         {/* Navigation Buttons */}
-        <div className="flex justify-between items-center pt-6 border-t border-gray-200">
+        <div className="flex justify-between items-center pt-6 border-t-2 border-gray-200">
           <button
             onClick={handlePrevious}
             disabled={isFirstQuestion}
-            className={`flex items-center px-4 py-2 text-sm font-medium rounded-lg transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 mobile:min-h-[44px] tablet:min-h-[48px] mobile:px-6 tablet:px-6 ${
+            className={`flex items-center px-4 py-2 text-sm font-medium rounded-lg transition-colors duration-200 focus:outline-none focus:ring-3 focus:ring-blue-500 focus:ring-offset-2 touch-target ${
               isFirstQuestion
-                ? 'text-gray-400 cursor-not-allowed'
-                : 'text-gray-700 hover:bg-gray-100'
+                ? 'btn-disabled'
+                : 'btn-secondary'
             }`}
+            aria-label={`Go to previous question. Currently on question ${currentQuestionIndex + 1} of ${totalQuestions}`}
           >
-            <svg className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
             Previous
@@ -379,10 +454,11 @@ const Survey = ({
             {!isLastQuestion ? (
               <button
                 onClick={handleNext}
-                className="flex items-center btn-primary mobile:min-h-[44px] tablet:min-h-[48px] mobile:px-6 tablet:px-6"
+                className="flex items-center btn-primary touch-target"
+                aria-label={`Go to next question. Currently on question ${currentQuestionIndex + 1} of ${totalQuestions}`}
               >
                 Next
-                <svg className="h-4 w-4 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg className="h-4 w-4 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                 </svg>
               </button>
@@ -390,21 +466,23 @@ const Survey = ({
               <button
                 onClick={handleSubmit}
                 disabled={isSubmitting}
-                className={`flex items-center px-6 py-2 text-sm font-medium rounded-lg transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 mobile:min-h-[44px] tablet:min-h-[48px] mobile:px-8 tablet:px-8 ${
+                className={`flex items-center touch-target ${
                   isSubmitting
-                    ? 'bg-gray-400 cursor-not-allowed text-white'
-                    : 'bg-green-600 hover:bg-green-700 text-white'
+                    ? 'btn-disabled'
+                    : 'btn-success'
                 }`}
+                aria-label={`Submit survey with ${Object.keys(answers).length} answers`}
               >
                 {isSubmitting ? (
                   <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    <div className="loading-spinner h-4 w-4 border-white mr-2" aria-hidden="true"></div>
                     Submitting...
+                    <span className="sr-only">Please wait while your survey is being submitted</span>
                   </>
                 ) : (
                   <>
                     Submit Survey
-                    <svg className="h-4 w-4 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg className="h-4 w-4 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                     </svg>
                   </>

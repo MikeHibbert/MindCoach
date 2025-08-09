@@ -17,7 +17,10 @@
     "web-vitals": "^2.1.4"
   },
   "devDependencies": {
+    "@axe-core/react": "^4.10.2",
     "autoprefixer": "^10.4.15",
+    "axe-core": "^4.10.3",
+    "jest-axe": "^10.0.0",
     "postcss": "^8.4.29",
     "tailwindcss": "^3.3.3"
   },
@@ -27,6 +30,8 @@
     "test": "react-scripts test",
     "test:run": "react-scripts test --run-in-band --watchAll=false",
     "test:watch": "react-scripts test",
+    "test:accessibility": "react-scripts test --testNamePattern=\"Accessibility Tests\" --watchAll=false",
+    "audit:accessibility": "node src/scripts/accessibility-audit.js",
     "eject": "react-scripts eject"
   },
   "eslintConfig": {

@@ -1,8 +1,14 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
 import LessonService from '../services/lessonService';
+import { 
+  announceToScreenReader, 
+  keyboardNavigation, 
+  ariaLabels, 
+  focusManagement 
+} from '../utils/accessibility';
 
 const LessonViewer = ({ userId, subject, initialLessonNumber = 1 }) => {
   const [lessons, setLessons] = useState([]);
@@ -13,6 +19,12 @@ const LessonViewer = ({ userId, subject, initialLessonNumber = 1 }) => {
   const [error, setError] = useState(null);
   const [lessonCache, setLessonCache] = useState(new Map());
   const [completedLessons, setCompletedLessons] = useState(new Set());
+  
+  // Refs for accessibility
+  const lessonContentRef = useRef(null);
+  const sidebarRef = useRef(null);
+  const navigationRef = useRef(null);
+  const lessonRefs = useRef([]);
 
   // Load lesson list and progress on component mount
   useEffect(() => {
@@ -101,7 +113,32 @@ const LessonViewer = ({ userId, subject, initialLessonNumber = 1 }) => {
         markLessonAsCompleted(currentLessonNumber);
       }
       setCurrentLessonNumber(lessonNumber);
+      
+      // Announce navigation to screen readers
+      const lesson = lessons[lessonNumber - 1];
+      announceToScreenReader(`Navigated to lesson ${lessonNumber}: ${lesson?.title || 'Loading...'}`);
+      
+      // Focus management
+      if (lessonContentRef.current) {
+        focusManagement.setFocus(lessonContentRef.current, 300);
+      }
     }
+  };
+
+  // Handle keyboard navigation for lesson sidebar
+  const handleLessonKeyDown = (e, lessonIndex) => {
+    keyboardNavigation.handleArrowKeys(
+      e,
+      lessons,
+      lessonIndex,
+      (newIndex) => {
+        lessonRefs.current[newIndex]?.focus();
+      }
+    );
+
+    keyboardNavigation.handleActivation(e, () => {
+      navigateToLesson(lessonIndex + 1);
+    });
   };
 
   const markLessonAsCompleted = async (lessonNumber) => {
@@ -115,6 +152,10 @@ const LessonViewer = ({ userId, subject, initialLessonNumber = 1 }) => {
       // Update local state
       setCompletedLessons(prev => new Set([...prev, lessonNumber]));
       
+      // Announce completion
+      const lesson = lessons[lessonNumber - 1];
+      announceToScreenReader(`Lesson ${lessonNumber} "${lesson?.title}" marked as completed`);
+      
       // Update progress
       setProgress(prevProgress => {
         if (!prevProgress) return prevProgress;
@@ -127,6 +168,7 @@ const LessonViewer = ({ userId, subject, initialLessonNumber = 1 }) => {
       });
     } catch (err) {
       console.warn(`Failed to mark lesson ${lessonNumber} as completed:`, err.message);
+      announceToScreenReader(`Error marking lesson as completed: ${err.message}`, 'assertive');
     }
   };
 
@@ -159,19 +201,25 @@ const LessonViewer = ({ userId, subject, initialLessonNumber = 1 }) => {
   };
 
   const renderLessonNavigation = () => (
-    <div className="lesson-navigation bg-white border-t border-gray-200 p-4 sticky bottom-0">
+    <nav 
+      ref={navigationRef}
+      className="lesson-navigation bg-white border-t-2 border-gray-200 p-4 sticky bottom-0"
+      role="navigation"
+      aria-label="Lesson navigation"
+    >
       <div className="flex justify-between items-center max-w-4xl mx-auto">
         {/* Previous Button */}
         <button
           onClick={goToPreviousLesson}
           disabled={currentLessonNumber <= 1}
-          className={`flex items-center px-4 py-2 rounded-lg font-medium transition-colors ${
+          className={`flex items-center px-4 py-2 rounded-lg font-medium transition-colors focus:outline-none focus:ring-3 focus:ring-blue-500 focus:ring-offset-2 touch-target ${
             currentLessonNumber <= 1
-              ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-              : 'bg-blue-600 text-white hover:bg-blue-700 focus:ring-2 focus:ring-blue-500'
+              ? 'btn-disabled'
+              : 'btn-primary'
           }`}
+          aria-label={`Go to previous lesson. Currently on lesson ${currentLessonNumber} of ${lessons.length}`}
         >
-          <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
           </svg>
           Previous
@@ -179,13 +227,20 @@ const LessonViewer = ({ userId, subject, initialLessonNumber = 1 }) => {
 
         {/* Lesson Progress */}
         <div className="flex items-center space-x-2">
-          <span className="text-sm text-gray-600">
+          <span className="text-sm text-gray-700 font-medium">
             Lesson {currentLessonNumber} of {lessons.length}
           </span>
           {progress && (
-            <div className="w-32 bg-gray-200 rounded-full h-2">
+            <div 
+              className="w-32 bg-gray-200 rounded-full h-3 border border-gray-300"
+              role="progressbar"
+              aria-valuenow={currentLessonNumber}
+              aria-valuemin="1"
+              aria-valuemax={lessons.length}
+              aria-label={ariaLabels.navigation(currentLessonNumber, lessons.length, 'lesson')}
+            >
               <div
-                className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                className="bg-blue-600 h-full rounded-full transition-all duration-300"
                 style={{ width: `${(currentLessonNumber / lessons.length) * 100}%` }}
               />
             </div>
@@ -196,41 +251,58 @@ const LessonViewer = ({ userId, subject, initialLessonNumber = 1 }) => {
         <button
           onClick={goToNextLesson}
           disabled={currentLessonNumber >= lessons.length}
-          className={`flex items-center px-4 py-2 rounded-lg font-medium transition-colors ${
+          className={`flex items-center px-4 py-2 rounded-lg font-medium transition-colors focus:outline-none focus:ring-3 focus:ring-blue-500 focus:ring-offset-2 touch-target ${
             currentLessonNumber >= lessons.length
-              ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-              : 'bg-blue-600 text-white hover:bg-blue-700 focus:ring-2 focus:ring-blue-500'
+              ? 'btn-disabled'
+              : 'btn-primary'
           }`}
+          aria-label={`Go to next lesson. Currently on lesson ${currentLessonNumber} of ${lessons.length}`}
         >
           Next
-          <svg className="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
           </svg>
         </button>
       </div>
-    </div>
+    </nav>
   );
 
   const renderLessonSidebar = () => (
-    <div className="lesson-sidebar w-full lg:w-80 bg-white border-r border-gray-200 p-4 lg:sticky lg:top-0 lg:h-screen lg:overflow-y-auto">
+    <nav 
+      ref={sidebarRef}
+      className="lesson-sidebar w-full lg:w-80 bg-white border-r-2 border-gray-200 p-4 lg:sticky lg:top-0 lg:h-screen lg:overflow-y-auto"
+      role="navigation"
+      aria-label="Course lessons"
+    >
       <h3 className="text-lg font-semibold text-gray-900 mb-4">Course Progress</h3>
       
       {progress && (
         <div className="mb-6">
-          <div className="flex justify-between text-sm text-gray-600 mb-2">
+          <div className="flex justify-between text-sm text-gray-700 mb-2">
             <span>Overall Progress</span>
             <span>{Math.round(progress.progress_percentage)}%</span>
           </div>
-          <div className="w-full bg-gray-200 rounded-full h-2">
+          <div 
+            className="w-full bg-gray-200 rounded-full h-3 border border-gray-300"
+            role="progressbar"
+            aria-valuenow={Math.round(progress.progress_percentage)}
+            aria-valuemin="0"
+            aria-valuemax="100"
+            aria-label={ariaLabels.progressBar(
+              completedLessons.size, 
+              lessons.length, 
+              'Course completion'
+            )}
+          >
             <div
-              className="bg-green-600 h-2 rounded-full transition-all duration-300"
+              className="bg-green-600 h-full rounded-full transition-all duration-300"
               style={{ width: `${progress.progress_percentage}%` }}
             />
           </div>
         </div>
       )}
 
-      <div className="space-y-2">
+      <div className="space-y-2" role="list" aria-label="Lesson list">
         {lessons.map((lesson, index) => {
           const lessonNumber = index + 1;
           const isActive = lessonNumber === currentLessonNumber;
@@ -239,23 +311,33 @@ const LessonViewer = ({ userId, subject, initialLessonNumber = 1 }) => {
           return (
             <button
               key={lessonNumber}
+              ref={(el) => lessonRefs.current[index] = el}
               onClick={() => navigateToLesson(lessonNumber)}
-              className={`w-full text-left p-3 rounded-lg transition-colors ${
+              onKeyDown={(e) => handleLessonKeyDown(e, index)}
+              className={`w-full text-left p-3 rounded-lg transition-colors focus:outline-none focus:ring-3 focus:ring-blue-500 focus:ring-offset-2 touch-target ${
                 isActive
-                  ? 'bg-blue-100 border-2 border-blue-500 text-blue-900'
+                  ? 'bg-blue-100 border-2 border-blue-600 text-blue-900'
                   : isCompleted
-                  ? 'bg-green-50 border border-green-200 text-green-800 hover:bg-green-100'
-                  : 'bg-gray-50 border border-gray-200 text-gray-700 hover:bg-gray-100'
+                  ? 'bg-green-50 border-2 border-green-300 text-green-800 hover:bg-green-100'
+                  : 'bg-gray-50 border-2 border-gray-300 text-gray-800 hover:bg-gray-100'
               }`}
+              aria-current={isActive ? 'page' : undefined}
+              aria-label={`Lesson ${lessonNumber}: ${lesson.title}. ${
+                isCompleted ? 'Completed' : 'Not completed'
+              }. ${lesson.estimated_time}. Difficulty: ${lesson.difficulty}`}
+              role="listitem"
             >
               <div className="flex items-center">
-                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold mr-3 ${
-                  isActive
-                    ? 'bg-blue-600 text-white'
-                    : isCompleted
-                    ? 'bg-green-600 text-white'
-                    : 'bg-gray-300 text-gray-600'
-                }`}>
+                <div 
+                  className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold mr-3 ${
+                    isActive
+                      ? 'bg-blue-700 text-white'
+                      : isCompleted
+                      ? 'bg-green-700 text-white'
+                      : 'bg-gray-400 text-gray-100'
+                  }`}
+                  aria-hidden="true"
+                >
                   {isCompleted ? '✓' : lessonNumber}
                 </div>
                 <div className="flex-1">
@@ -264,12 +346,15 @@ const LessonViewer = ({ userId, subject, initialLessonNumber = 1 }) => {
                     {lesson.estimated_time} • {lesson.difficulty}
                   </div>
                 </div>
+                {isActive && (
+                  <span className="sr-only">(current lesson)</span>
+                )}
               </div>
             </button>
           );
         })}
       </div>
-    </div>
+    </nav>
   );
 
   if (!userId || !subject) {
@@ -376,21 +461,27 @@ const LessonViewer = ({ userId, subject, initialLessonNumber = 1 }) => {
               </div>
 
               {/* Lesson Content */}
-              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+              <div 
+              ref={lessonContentRef}
+              className="bg-white rounded-lg shadow-sm border-2 border-gray-200 p-6"
+              tabIndex="-1"
+              role="main"
+              aria-label="Lesson content"
+            >
                 <div className="prose prose-lg max-w-none">
                   <ReactMarkdown
                     remarkPlugins={[remarkGfm]}
                     rehypePlugins={[rehypeHighlight]}
                     components={{
-                      // Custom rendering for code blocks
+                      // Custom rendering for code blocks with accessibility
                       code: ({ node, inline, className, children, ...props }) => {
-                        const match = /language-(\w+)/.exec(className || '');
-                        return !inline && match ? (
-                          <div className="relative">
-                            <div className="absolute top-2 right-2 text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
-                              {match[1]}
+                        const languageMatch = /language-(\w+)/.exec(className || '');
+                        return !inline && languageMatch ? (
+                          <div className="relative" role="region" aria-label={`Code example in ${languageMatch[1]}`}>
+                            <div className="absolute top-2 right-2 text-xs text-gray-600 bg-gray-100 px-2 py-1 rounded border">
+                              {languageMatch[1]}
                             </div>
-                            <pre className={className} {...props}>
+                            <pre className={className} {...props} tabIndex="0">
                               <code>{children}</code>
                             </pre>
                           </div>
@@ -400,11 +491,47 @@ const LessonViewer = ({ userId, subject, initialLessonNumber = 1 }) => {
                           </code>
                         );
                       },
-                      // Custom rendering for blockquotes (can be used for tips/notes)
+                      // Custom rendering for blockquotes with accessibility
                       blockquote: ({ children }) => (
-                        <blockquote className="border-l-4 border-blue-400 bg-blue-50 p-4 my-4 rounded-r-lg">
+                        <blockquote 
+                          className="border-l-4 border-blue-500 bg-blue-50 p-4 my-4 rounded-r-lg"
+                          role="note"
+                          aria-label="Important note"
+                        >
                           {children}
                         </blockquote>
+                      ),
+                      // Accessible headings
+                      h1: ({ children }) => (
+                        <h1 className="text-2xl font-bold text-gray-900 mb-4" tabIndex="0">
+                          {children}
+                        </h1>
+                      ),
+                      h2: ({ children }) => (
+                        <h2 className="text-xl font-semibold text-gray-900 mb-3" tabIndex="0">
+                          {children}
+                        </h2>
+                      ),
+                      h3: ({ children }) => (
+                        <h3 className="text-lg font-medium text-gray-900 mb-2" tabIndex="0">
+                          {children}
+                        </h3>
+                      ),
+                      // Accessible lists
+                      ul: ({ children }) => (
+                        <ul className="list-disc list-inside space-y-1 text-gray-800" role="list">
+                          {children}
+                        </ul>
+                      ),
+                      ol: ({ children }) => (
+                        <ol className="list-decimal list-inside space-y-1 text-gray-800" role="list">
+                          {children}
+                        </ol>
+                      ),
+                      li: ({ children }) => (
+                        <li className="text-gray-800" role="listitem">
+                          {children}
+                        </li>
                       ),
                     }}
                   >
@@ -413,10 +540,14 @@ const LessonViewer = ({ userId, subject, initialLessonNumber = 1 }) => {
                 </div>
 
                 {/* Lesson Completion */}
-                <div className="mt-6 pt-6 border-t border-gray-200">
+                <div className="mt-6 pt-6 border-t-2 border-gray-200">
                   {completedLessons.has(currentLessonNumber) ? (
-                    <div className="flex items-center text-green-600">
-                      <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <div 
+                      className="flex items-center text-green-700 bg-green-50 border-2 border-green-200 rounded-lg p-3"
+                      role="status"
+                      aria-live="polite"
+                    >
+                      <svg className="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                       </svg>
                       <span className="font-medium">Lesson completed!</span>
@@ -424,9 +555,10 @@ const LessonViewer = ({ userId, subject, initialLessonNumber = 1 }) => {
                   ) : (
                     <button
                       onClick={() => markLessonAsCompleted(currentLessonNumber)}
-                      className="flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors focus:ring-2 focus:ring-green-500"
+                      className="btn-success focus:ring-green-500 touch-target"
+                      aria-label={`Mark lesson ${currentLessonNumber} as completed`}
                     >
-                      <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                       </svg>
                       Mark as Complete
