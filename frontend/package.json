@@ -6,17 +6,20 @@
     "@testing-library/jest-dom": "^5.17.0",
     "@testing-library/react": "^13.4.0",
     "@testing-library/user-event": "^14.5.2",
+    "axios": "^1.5.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
+    "react-markdown": "^10.1.0",
     "react-router-dom": "^6.15.0",
     "react-scripts": "5.0.1",
-    "axios": "^1.5.0",
+    "rehype-highlight": "^7.0.2",
+    "remark-gfm": "^4.0.1",
     "web-vitals": "^2.1.4"
   },
   "devDependencies": {
-    "tailwindcss": "^3.3.3",
     "autoprefixer": "^10.4.15",
-    "postcss": "^8.4.29"
+    "postcss": "^8.4.29",
+    "tailwindcss": "^3.3.3"
   },
   "scripts": {
     "start": "react-scripts start",
@@ -30,6 +33,11 @@
     "extends": [
       "react-app",
       "react-app/jest"
+    ]
+  },
+  "jest": {
+    "transformIgnorePatterns": [
+      "node_modules/(?!(axios|react-markdown|remark-gfm|rehype-highlight|unified|bail|is-plain-obj|trough|vfile|unist-util-stringify-position|mdast-util-from-markdown|mdast-util-to-markdown|micromark|decode-named-character-reference|character-entities|mdast-util-to-string|unist-util-generated|unist-util-position|unist-util-visit|unist-util-is|unist-util-visit-parents|mdast-util-gfm|mdast-util-gfm-table|mdast-util-gfm-strikethrough|mdast-util-gfm-task-list-item|mdast-util-gfm-autolink-literal|mdast-util-gfm-footnote|micromark-extension-gfm|micromark-extension-gfm-table|micromark-extension-gfm-strikethrough|micromark-extension-gfm-task-list-item|micromark-extension-gfm-autolink-literal|micromark-extension-gfm-footnote|hast-util-to-jsx-runtime|hast-util-whitespace|property-information|hast-util-parse-selector|hastscript|web-namespaces|comma-separated-tokens|space-separated-tokens|html-void-elements|zwitch|trim-lines|mdast-util-to-hast|unist-util-position-from-estree|unist-util-remove-position|unist-util-generated|mdast-util-definitions|unist-builder|hastscript|html-void-elements|web-namespaces|property-information|hast-util-parse-selector|comma-separated-tokens|space-separated-tokens|zwitch|trim-lines)/)"
     ]
   },
   "browserslist": {

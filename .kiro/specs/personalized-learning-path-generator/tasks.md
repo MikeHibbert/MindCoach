@@ -242,6 +242,7 @@
 
 
 
+
   - [x] 10.1 Create dynamic Survey component
 
 
@@ -262,15 +263,24 @@
     - Write end-to-end tests for survey workflow
     - _Requirements: 2.2, 2.3, 2.4_
 
-- [ ] 11. Create lesson viewing interface
-  - [ ] 11.1 Build LessonViewer component
+- [x] 11. Create lesson viewing interface
+
+
+
+
+
+  - [x] 11.1 Build LessonViewer component
+
+
     - Implement markdown-to-HTML rendering for lessons
     - Create responsive lesson display with proper typography
     - Add lesson navigation and progress tracking
     - Implement quiz rendering within lessons
     - _Requirements: 3.4, 3.5, 3.6_
 
-  - [ ] 11.2 Integrate lesson viewer with backend
+  - [x] 11.2 Integrate lesson viewer with backend
+
+
     - Connect LessonViewer to lesson retrieval API
     - Implement lesson loading and caching
     - Add lesson completion tracking

@@ -52,3 +52,93 @@
     @apply w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent;
   }
 }
+
+/* Syntax highlighting styles for code blocks */
+@layer utilities {
+  .prose {
+    max-width: none;
+  }
+  
+  .prose pre {
+    @apply bg-gray-900 text-gray-100 rounded-lg p-4 overflow-x-auto;
+  }
+  
+  .prose code {
+    @apply bg-gray-100 text-gray-800 px-1 py-0.5 rounded text-sm;
+  }
+  
+  .prose pre code {
+    @apply bg-transparent text-gray-100 p-0;
+  }
+  
+  /* Highlight.js theme - GitHub Dark */
+  .hljs {
+    @apply bg-gray-900 text-gray-100;
+  }
+  
+  .hljs-comment,
+  .hljs-quote {
+    @apply text-gray-400 italic;
+  }
+  
+  .hljs-keyword,
+  .hljs-selector-tag,
+  .hljs-subst {
+    @apply text-purple-400 font-semibold;
+  }
+  
+  .hljs-number,
+  .hljs-literal,
+  .hljs-variable,
+  .hljs-template-variable,
+  .hljs-tag .hljs-attr {
+    @apply text-blue-400;
+  }
+  
+  .hljs-string,
+  .hljs-doctag {
+    @apply text-green-400;
+  }
+  
+  .hljs-title,
+  .hljs-section,
+  .hljs-selector-id {
+    @apply text-yellow-400 font-semibold;
+  }
+  
+  .hljs-subst {
+    @apply font-normal;
+  }
+  
+  .hljs-type,
+  .hljs-class .hljs-title,
+  .hljs-tag,
+  .hljs-regexp,
+  .hljs-link {
+    @apply text-red-400;
+  }
+  
+  .hljs-symbol,
+  .hljs-bullet,
+  .hljs-built_in,
+  .hljs-builtin-name {
+    @apply text-cyan-400;
+  }
+  
+  .hljs-meta,
+  .hljs-deletion {
+    @apply text-gray-500;
+  }
+  
+  .hljs-addition {
+    @apply text-green-400;
+  }
+  
+  .hljs-emphasis {
+    @apply italic;
+  }
+  
+  .hljs-strong {
+    @apply font-bold;
+  }
+}
