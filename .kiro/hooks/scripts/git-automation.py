@@ -241,8 +241,13 @@ class GitAutomation:
             return True
             
         except GitAutomationError as e:
-            self.logger.error(f"Failed to create commit: {e}")
-            return False
+            # Check if the error is due to no changes to commit
+            if "nothing to commit" in str(e).lower() or "no changes added to commit" in str(e).lower():
+                self.logger.info("No changes to commit - skipping")
+                return True  # This is not an error, just no changes
+            else:
+                self.logger.error(f"Failed to create commit: {e}")
+                return False
     
     def push_to_remote(self):
         """
@@ -387,6 +392,15 @@ class GitAutomation:
                 if not self.stage_all_changes():
                     self.logger.error(f"Failed to stage changes for task {task_number}")
                     continue
+                
+                # Check if there are actually changes to commit
+                status = self.get_git_status()
+                if status:
+                    total_changes = (len(status['modified']) + len(status['added']) + 
+                                   len(status['deleted']) + len(status['untracked']))
+                    if total_changes == 0:
+                        self.logger.info(f"No changes to commit for task {task_number} - skipping")
+                        continue
                 
                 # Generate commit message
                 commit_message = self.generate_commit_message(task_number, task_description)
