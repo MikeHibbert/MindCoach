@@ -3,6 +3,7 @@ from typing import Optional, Dict, List, Any
 from pathlib import Path
 
 from .file_service import FileService, FileServiceError
+from .cache_service import cached, CacheTTL, CacheKeys
 
 
 class UserDataServiceError(Exception):
@@ -38,6 +39,7 @@ class UserDataService:
             raise UserDataServiceError(f"Failed to save user selection: {e}")
     
     @classmethod
+    @cached(ttl=CacheTTL.MEDIUM, key_prefix=CacheKeys.USER)
     def load_user_selection(cls, user_id: str) -> Optional[Dict[str, Any]]:
         """Load user's subject selection from selection.json"""
         try:
@@ -79,6 +81,7 @@ class UserDataService:
             raise UserDataServiceError(f"Failed to save survey: {e}")
     
     @classmethod
+    @cached(ttl=CacheTTL.LONG, key_prefix=CacheKeys.SURVEY)
     def load_survey(cls, user_id: str, subject: str) -> Optional[Dict[str, Any]]:
         """Load survey questions from survey.json"""
         try:
@@ -202,6 +205,7 @@ class UserDataService:
             raise UserDataServiceError(f"Failed to save lesson content: {e}")
     
     @classmethod
+    @cached(ttl=CacheTTL.VERY_LONG, key_prefix=CacheKeys.LESSON)
     def load_lesson_content(cls, user_id: str, subject: str, lesson_id: int) -> Optional[str]:
         """Load lesson content from markdown file"""
         try:

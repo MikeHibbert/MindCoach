@@ -2,39 +2,48 @@
  * Subscription Service
  * Handles subscription management API calls
  */
+import { withCache, CACHE_KEYS, CACHE_TTL } from './cacheService';
 
 class SubscriptionService {
-  static async getUserSubscriptions(userId) {
-    try {
-      const response = await fetch(`/api/users/${encodeURIComponent(userId)}/subscriptions`);
-      const data = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(data.error?.message || 'Failed to fetch subscriptions');
+  static getUserSubscriptions = withCache(
+    async (userId) => {
+      try {
+        const response = await fetch(`/api/users/${encodeURIComponent(userId)}/subscriptions`);
+        const data = await response.json();
+        
+        if (!response.ok) {
+          throw new Error(data.error?.message || 'Failed to fetch subscriptions');
+        }
+        
+        return data;
+      } catch (error) {
+        console.error('Error fetching user subscriptions:', error);
+        throw error;
       }
-      
-      return data;
-    } catch (error) {
-      console.error('Error fetching user subscriptions:', error);
-      throw error;
-    }
-  }
+    },
+    (userId) => CACHE_KEYS.USER_SUBSCRIPTIONS(userId),
+    CACHE_TTL.MEDIUM
+  );
 
-  static async getSubjectStatus(userId, subject) {
-    try {
-      const response = await fetch(`/api/users/${encodeURIComponent(userId)}/subjects/${encodeURIComponent(subject)}/status`);
-      const data = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(data.error?.message || 'Failed to fetch subject status');
+  static getSubjectStatus = withCache(
+    async (userId, subject) => {
+      try {
+        const response = await fetch(`/api/users/${encodeURIComponent(userId)}/subjects/${encodeURIComponent(subject)}/status`);
+        const data = await response.json();
+        
+        if (!response.ok) {
+          throw new Error(data.error?.message || 'Failed to fetch subject status');
+        }
+        
+        return data;
+      } catch (error) {
+        console.error('Error fetching subject status:', error);
+        throw error;
       }
-      
-      return data;
-    } catch (error) {
-      console.error('Error fetching subject status:', error);
-      throw error;
-    }
-  }
+    },
+    (userId, subject) => CACHE_KEYS.SUBJECT_STATUS(userId, subject),
+    CACHE_TTL.SHORT
+  );
 
   static async purchaseSubscription(userId, subject, plan = 'monthly') {
     try {
