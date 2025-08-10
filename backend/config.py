@@ -10,6 +10,10 @@ class Config:
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16MB max file size
     
+    # xAI API Configuration
+    XAI_API_KEY = os.environ.get('XAI_API_KEY')
+    GROK_API_URL = os.environ.get('GROK_API_URL', 'https://api.x.ai/v1')
+    
     # Cache settings
     CACHE_DEFAULT_TIMEOUT = 300  # 5 minutes
     CACHE_THRESHOLD = 1000
@@ -50,6 +54,11 @@ class ProductionConfig(Config):
     SECRET_KEY = os.environ.get('SECRET_KEY')
     if not SECRET_KEY:
         raise ValueError("SECRET_KEY environment variable must be set in production")
+    
+    # xAI API validation for production
+    XAI_API_KEY = os.environ.get('XAI_API_KEY')
+    if not XAI_API_KEY:
+        raise ValueError("XAI_API_KEY environment variable must be set in production")
     
     # Production CORS settings
     CORS_ORIGINS = os.environ.get('CORS_ORIGINS', '').split(',')
