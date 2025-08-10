@@ -1,0 +1,42 @@
+{
+  "name": "Git Automation Hook",
+  "description": "Automatically commits and pushes code when top-level tasks are completed",
+  "trigger": {
+    "type": "file_change",
+    "file": ".kiro/specs/personalized-learning-path-generator/tasks.md",
+    "pattern": "- \\[x\\] \\d+\\.",
+    "description": "Triggers when a top-level task is marked as completed in tasks.md"
+  },
+  "conditions": [
+    {
+      "type": "task_completion",
+      "description": "Only trigger for top-level task completions (not subtasks)",
+      "pattern": "^- \\[x\\] (\\d+)\\. (.+)$",
+      "exclude_pattern": "^- \\[x\\] \\d+\\.\\d+ "
+    }
+  ],
+  "actions": [
+    {
+      "type": "execute_script",
+      "script": ".kiro/hooks/scripts/git-automation.py",
+      "parameters": {
+        "task_file": ".kiro/specs/personalized-learning-path-generator/tasks.md",
+        "project_root": ".",
+        "log_file": ".kiro/hooks/logs/git-automation.log"
+      }
+    }
+  ],
+  "settings": {
+    "enabled": true,
+    "async": true,
+    "timeout": 300,
+    "retry_count": 3,
+    "retry_delay": 5
+  },
+  "logging": {
+    "level": "INFO",
+    "file": ".kiro/hooks/logs/git-automation.log",
+    "max_size": "10MB",
+    "backup_count": 5
+  }
+}
