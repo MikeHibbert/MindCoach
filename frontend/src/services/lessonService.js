@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { withCache, CACHE_KEYS, CACHE_TTL } from './cacheService';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000/api';
 
@@ -9,17 +10,21 @@ class LessonService {
    * @param {string} subject - Subject name
    * @returns {Promise<Object>} Lesson list response
    */
-  static async listLessons(userId, subject) {
-    try {
-      const response = await axios.get(
-        `${API_BASE_URL}/users/${userId}/subjects/${subject}/lessons`
-      );
-      return response.data;
-    } catch (error) {
-      console.error('Error listing lessons:', error);
-      throw this.handleError(error);
-    }
-  }
+  static listLessons = withCache(
+    async (userId, subject) => {
+      try {
+        const response = await axios.get(
+          `${API_BASE_URL}/users/${userId}/subjects/${subject}/lessons`
+        );
+        return response.data;
+      } catch (error) {
+        console.error('Error listing lessons:', error);
+        throw LessonService.handleError(error);
+      }
+    },
+    (userId, subject) => CACHE_KEYS.LESSONS(userId, subject),
+    CACHE_TTL.MEDIUM
+  );
 
   /**
    * Get a specific lesson by number
@@ -28,17 +33,21 @@ class LessonService {
    * @param {number} lessonNumber - Lesson number
    * @returns {Promise<Object>} Lesson data
    */
-  static async getLesson(userId, subject, lessonNumber) {
-    try {
-      const response = await axios.get(
-        `${API_BASE_URL}/users/${userId}/subjects/${subject}/lessons/${lessonNumber}`
-      );
-      return response.data;
-    } catch (error) {
-      console.error(`Error getting lesson ${lessonNumber}:`, error);
-      throw this.handleError(error);
-    }
-  }
+  static getLesson = withCache(
+    async (userId, subject, lessonNumber) => {
+      try {
+        const response = await axios.get(
+          `${API_BASE_URL}/users/${userId}/subjects/${subject}/lessons/${lessonNumber}`
+        );
+        return response.data;
+      } catch (error) {
+        console.error(`Error getting lesson ${lessonNumber}:`, error);
+        throw LessonService.handleError(error);
+      }
+    },
+    (userId, subject, lessonNumber) => CACHE_KEYS.LESSON_CONTENT(userId, subject, lessonNumber),
+    CACHE_TTL.LONG
+  );
 
   /**
    * Get lesson progress for a user and subject

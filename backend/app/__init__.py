@@ -1,8 +1,9 @@
-from flask import Flask, jsonify
+from flask import Flask, jsonify, request, g
 from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS
 import os
 import logging
+import time
 from logging.handlers import RotatingFileHandler
 
 db = SQLAlchemy()
@@ -10,24 +11,18 @@ db = SQLAlchemy()
 def create_app(config_name=None):
     app = Flask(__name__)
     
-    # Configuration based on environment
-    if config_name == 'testing':
-        app.config['TESTING'] = True
-        app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///:memory:'
-        app.config['WTF_CSRF_ENABLED'] = False
-    else:
-        app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///learning_path.db'
+    # Load configuration
+    config_name = config_name or os.environ.get('FLASK_ENV', 'development')
     
-    app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-    app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-secret-key')
-    app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
+    from config import config
+    app.config.from_object(config[config_name])
     
     # Initialize extensions
     db.init_app(app)
     
     # Configure CORS with security settings
     CORS(app, 
-         origins=['http://localhost:3000'],  # Frontend URL
+         origins=app.config['CORS_ORIGINS'],
          methods=['GET', 'POST', 'PUT', 'DELETE'],
          allow_headers=['Content-Type', 'Authorization'])
     
@@ -37,6 +32,9 @@ def create_app(config_name=None):
     # Register error handlers
     register_error_handlers(app)
     
+    # Register performance monitoring
+    register_performance_monitoring(app)
+    
     # Register blueprints
     from app.api.users import users_bp
     from app.api.subjects import subjects_bp
@@ -44,6 +42,7 @@ def create_app(config_name=None):
     from app.api.lessons import lessons_bp
     from app.api.subscriptions import subscriptions_bp
     from app.api.payment_gate import payment_gate_bp
+    from app.api.health import health_bp
     
     app.register_blueprint(users_bp, url_prefix='/api')
     app.register_blueprint(subjects_bp, url_prefix='/api')
@@ -51,12 +50,61 @@ def create_app(config_name=None):
     app.register_blueprint(lessons_bp, url_prefix='/api')
     app.register_blueprint(subscriptions_bp, url_prefix='/api')
     app.register_blueprint(payment_gate_bp, url_prefix='/api')
+    app.register_blueprint(health_bp, url_prefix='/api')
+    
+    # Add performance monitoring endpoint
+    @app.route('/api/admin/performance')
+    def get_performance_metrics():
+        from app.services.performance_service import performance_monitor
+        from app.services.cache_service import cache
+        
+        return jsonify({
+            'performance_metrics': performance_monitor.get_metrics(),
+            'cache_stats': cache.get_stats(),
+            'database_stats': get_database_stats()
+        })
     
     return app
 
+def register_performance_monitoring(app):
+    """Register performance monitoring middleware"""
+    
+    @app.before_request
+    def before_request():
+        g.start_time = time.time()
+    
+    @app.after_request
+    def after_request(response):
+        if hasattr(g, 'start_time'):
+            duration = time.time() - g.start_time
+            
+            # Log slow requests
+            if duration > 1.0:
+                app.logger.warning(
+                    f"Slow request: {request.method} {request.path} - {duration:.2f}s"
+                )
+            
+            # Add performance headers
+            response.headers['X-Response-Time'] = f"{duration:.3f}s"
+        
+        return response
+
+def get_database_stats():
+    """Get basic database statistics"""
+    try:
+        from app.services.performance_service import DatabaseOptimizer
+        return DatabaseOptimizer.get_connection_pool_status()
+    except Exception as e:
+        return {'error': str(e)}
+
 def setup_logging(app):
     """Configure application logging"""
-    if not app.debug and not app.testing:
+    if app.testing:
+        # Disable logging during tests to avoid file conflicts
+        app.logger.setLevel(logging.CRITICAL)
+        return
+    
+    if not app.debug:
         # Create logs directory if it doesn't exist
         if not os.path.exists('logs'):
             os.mkdir('logs')
@@ -72,9 +120,6 @@ def setup_logging(app):
         
         app.logger.setLevel(logging.INFO)
         app.logger.info('Learning Path Generator startup')
-    elif app.testing:
-        # Disable logging during tests to avoid file conflicts
-        app.logger.setLevel(logging.CRITICAL)
 
 def register_error_handlers(app):
     """Register global error handlers"""
