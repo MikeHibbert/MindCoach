@@ -1,14 +1,14 @@
 import LessonService from '../lessonService';
 
 // Mock axios
-const mockAxios = {
+jest.mock('axios', () => ({
   get: jest.fn(),
   post: jest.fn(),
   put: jest.fn(),
   delete: jest.fn(),
-};
+}));
 
-jest.mock('axios', () => mockAxios);
+import axios from 'axios';
 
 describe('LessonService', () => {
   beforeEach(() => {
@@ -36,11 +36,11 @@ describe('LessonService', () => {
         }
       };
 
-      mockAxios.get.mockResolvedValue(mockResponse);
+      axios.get.mockResolvedValue(mockResponse);
 
       const result = await LessonService.listLessons('user123', 'python');
 
-      expect(mockAxios.get).toHaveBeenCalledWith(
+      expect(axios.get).toHaveBeenCalledWith(
         'http://localhost:5000/api/users/user123/subjects/python/lessons'
       );
       expect(result).toEqual(mockResponse.data);
@@ -58,7 +58,7 @@ describe('LessonService', () => {
         }
       };
 
-      mockAxios.get.mockRejectedValue(mockError);
+      axios.get.mockRejectedValue(mockError);
 
       await expect(LessonService.listLessons('user123', 'python'))
         .rejects
@@ -70,7 +70,7 @@ describe('LessonService', () => {
         request: {}
       };
 
-      mockAxios.get.mockRejectedValue(mockError);
+      axios.get.mockRejectedValue(mockError);
 
       await expect(LessonService.listLessons('user123', 'python'))
         .rejects
@@ -94,11 +94,11 @@ describe('LessonService', () => {
         }
       };
 
-      mockAxios.get.mockResolvedValue(mockResponse);
+      axios.get.mockResolvedValue(mockResponse);
 
       const result = await LessonService.getLesson('user123', 'python', 1);
 
-      expect(mockAxios.get).toHaveBeenCalledWith(
+      expect(axios.get).toHaveBeenCalledWith(
         'http://localhost:5000/api/users/user123/subjects/python/lessons/1'
       );
       expect(result).toEqual(mockResponse.data);
@@ -116,7 +116,7 @@ describe('LessonService', () => {
         }
       };
 
-      mockAxios.get.mockRejectedValue(mockError);
+      axios.get.mockRejectedValue(mockError);
 
       await expect(LessonService.getLesson('user123', 'python', 5))
         .rejects
@@ -135,7 +135,7 @@ describe('LessonService', () => {
         }
       };
 
-      mockAxios.get.mockRejectedValue(mockError);
+      axios.get.mockRejectedValue(mockError);
 
       const error = await LessonService.getLesson('user123', 'python', 1)
         .catch(err => err);
@@ -162,11 +162,11 @@ describe('LessonService', () => {
         }
       };
 
-      mockAxios.get.mockResolvedValue(mockResponse);
+      axios.get.mockResolvedValue(mockResponse);
 
       const result = await LessonService.getLessonProgress('user123', 'python');
 
-      expect(mockAxios.get).toHaveBeenCalledWith(
+      expect(axios.get).toHaveBeenCalledWith(
         'http://localhost:5000/api/users/user123/subjects/python/lessons/progress'
       );
       expect(result).toEqual(mockResponse.data);
@@ -184,7 +184,7 @@ describe('LessonService', () => {
         }
       };
 
-      mockAxios.get.mockRejectedValue(mockError);
+      axios.get.mockRejectedValue(mockError);
 
       await expect(LessonService.getLessonProgress('user123', 'python'))
         .rejects
@@ -208,11 +208,11 @@ describe('LessonService', () => {
         }
       };
 
-      mockAxios.post.mockResolvedValue(mockResponse);
+      axios.post.mockResolvedValue(mockResponse);
 
       const result = await LessonService.generateLessons('user123', 'python');
 
-      expect(mockAxios.post).toHaveBeenCalledWith(
+      expect(axios.post).toHaveBeenCalledWith(
         'http://localhost:5000/api/users/user123/subjects/python/lessons/generate'
       );
       expect(result).toEqual(mockResponse.data);
@@ -234,7 +234,7 @@ describe('LessonService', () => {
         }
       };
 
-      mockAxios.post.mockRejectedValue(mockError);
+      axios.post.mockRejectedValue(mockError);
 
       const error = await LessonService.generateLessons('user123', 'python')
         .catch(err => err);
@@ -256,7 +256,7 @@ describe('LessonService', () => {
         }
       };
 
-      mockAxios.post.mockRejectedValue(mockError);
+      axios.post.mockRejectedValue(mockError);
 
       await expect(LessonService.generateLessons('user123', 'python'))
         .rejects
@@ -335,11 +335,11 @@ describe('LessonService', () => {
         }
       };
 
-      mockAxios.post.mockResolvedValue(mockResponse);
+      axios.post.mockResolvedValue(mockResponse);
 
       const result = await LessonService.markLessonCompleted('user123', 'python', 1);
 
-      expect(mockAxios.post).toHaveBeenCalledWith(
+      expect(axios.post).toHaveBeenCalledWith(
         'http://localhost:5000/api/users/user123/subjects/python/lessons/1/complete'
       );
       expect(result).toEqual(mockResponse.data);
@@ -357,7 +357,7 @@ describe('LessonService', () => {
         }
       };
 
-      mockAxios.post.mockRejectedValue(mockError);
+      axios.post.mockRejectedValue(mockError);
 
       await expect(LessonService.markLessonCompleted('user123', 'python', 1))
         .rejects
@@ -380,11 +380,11 @@ describe('LessonService', () => {
         }
       };
 
-      mockAxios.get.mockResolvedValue(mockResponse);
+      axios.get.mockResolvedValue(mockResponse);
 
       const result = await LessonService.getLessonCompletionStatus('user123', 'python');
 
-      expect(mockAxios.get).toHaveBeenCalledWith(
+      expect(axios.get).toHaveBeenCalledWith(
         'http://localhost:5000/api/users/user123/subjects/python/lessons/completion'
       );
       expect(result).toEqual(mockResponse.data);
@@ -402,7 +402,7 @@ describe('LessonService', () => {
         }
       };
 
-      mockAxios.get.mockRejectedValue(mockError);
+      axios.get.mockRejectedValue(mockError);
 
       await expect(LessonService.getLessonCompletionStatus('user123', 'python'))
         .rejects
@@ -420,11 +420,11 @@ describe('LessonService', () => {
       const LessonServiceWithCustomURL = require('../lessonService').default;
 
       // Mock axios for this test
-      mockAxios.get.mockResolvedValue({ data: { success: true } });
+      axios.get.mockResolvedValue({ data: { success: true } });
 
       LessonServiceWithCustomURL.listLessons('user123', 'python');
 
-      expect(mockAxios.get).toHaveBeenCalledWith(
+      expect(axios.get).toHaveBeenCalledWith(
         'https://api.example.com/users/user123/subjects/python/lessons'
       );
 
@@ -441,11 +441,11 @@ describe('LessonService', () => {
       const LessonServiceWithDefaultURL = require('../lessonService').default;
 
       // Mock axios for this test
-      mockAxios.get.mockResolvedValue({ data: { success: true } });
+      axios.get.mockResolvedValue({ data: { success: true } });
 
       LessonServiceWithDefaultURL.listLessons('user123', 'python');
 
-      expect(mockAxios.get).toHaveBeenCalledWith(
+      expect(axios.get).toHaveBeenCalledWith(
         'http://localhost:5000/api/users/user123/subjects/python/lessons'
       );
 

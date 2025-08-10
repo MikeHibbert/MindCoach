@@ -106,6 +106,30 @@ The Personalized Learning Path Generator is a web application, branded as MindCo
 6. WHEN monitoring system health THEN the system SHALL implement container health checks and logging.
 7. WHEN developing locally THEN the system SHALL provide a development Docker configuration with hot reloading and debugging support.
 
+### Requirement 11
+**User Story:** As a developer, I want an automated git workflow that commits and pushes code when tasks are completed, so that progress is automatically tracked and code is safely stored in version control.
+#### Acceptance Criteria
+1. WHEN a top-level task in the tasks.md file is marked as complete THEN the system SHALL automatically stage all new and modified files using git add.
+2. WHEN staging files THEN the system SHALL create a commit message that includes the completed task number and description.
+3. WHEN creating commit messages THEN the system SHALL follow the format "Complete Task X.Y: [task description]" where X.Y is the task number.
+4. WHEN a commit is created THEN the system SHALL automatically push the changes to the remote repository.
+5. WHEN the git operations execute THEN the system SHALL handle authentication using existing git credentials.
+6. WHEN git operations fail THEN the system SHALL log errors and notify the user without interrupting the development workflow.
+7. WHEN multiple tasks are completed simultaneously THEN the system SHALL create separate commits for each completed task.
+
+### Requirement 12
+**User Story:** As a developer and user, I want comprehensive documentation that covers setup, installation, and usage instructions, so that anyone can understand how to install, configure, and use the application effectively.
+#### Acceptance Criteria
+1. WHEN documentation is created THEN the system SHALL generate a comprehensive README.md file in the project root.
+2. WHEN creating setup documentation THEN the system SHALL include step-by-step installation instructions for all dependencies including Python, Node.js, Docker, and required packages.
+3. WHEN documenting installation THEN the system SHALL provide instructions for both development and production environments.
+4. WHEN creating usage documentation THEN the system SHALL include user guides for all major features including subject selection, surveys, lesson generation, and subscription management.
+5. WHEN documenting the system THEN the system SHALL include API documentation with endpoint descriptions, request/response examples, and authentication requirements.
+6. WHEN creating developer documentation THEN the system SHALL include architecture overview, component descriptions, and contribution guidelines.
+7. WHEN documenting configuration THEN the system SHALL include environment variable descriptions, database setup instructions, and Docker configuration details.
+8. WHEN creating troubleshooting guides THEN the system SHALL include common issues, error messages, and their solutions.
+9. WHEN documentation is generated THEN the system SHALL ensure all content is current and reflects the implemented features from completed tasks.
+
 ## Design Overview
 - **Responsive UI**: Use Tailwind CSS for desktop (min-width: 1024px), tablet (min-width: 768px), and mobile (max-width: 767px) layouts.
 - **File Structure**: Store data in `users/<user_id>/<subject>` with `selection.json`, `survey.json`, `survey_answers.json`, `curriculum_scheme.json`, `lesson_plans.json`, and `lesson_1.md` to `lesson_10.md`.
