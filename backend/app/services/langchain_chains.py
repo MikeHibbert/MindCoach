@@ -102,40 +102,57 @@ class SurveyGenerationChain(ContentGenerationChain):
         return PromptTemplate(
             input_variables=["subject", "rag_guidelines"],
             template="""
-You are an expert educational content creator. Generate a knowledge assessment survey for the subject: {subject}
+You are an expert educational assessment designer. Create a comprehensive knowledge assessment survey for {subject}.
 
-Guidelines to follow:
+ASSESSMENT GUIDELINES:
 {rag_guidelines}
 
-Create 5-10 multiple choice questions that assess different skill levels (beginner, intermediate, advanced).
-Each question should help determine the learner's current knowledge level.
+REQUIREMENTS:
+1. Generate exactly 7-8 multiple choice questions
+2. Follow the difficulty distribution: 30% beginner, 50% intermediate, 20% advanced
+3. Cover core fundamental topics for {subject}
+4. Each question must have exactly 4 plausible options
+5. Ensure only one option is clearly correct
+6. Base incorrect options on common misconceptions
+7. Use clear, unambiguous language
+8. Include code snippets where appropriate for practical assessment
+
+DIFFICULTY DEFINITIONS:
+- **Beginner**: Basic terminology, syntax, simple recognition
+- **Intermediate**: Concept application, code understanding, problem-solving
+- **Advanced**: Best practices, optimization, complex scenarios
 
 Return your response as a JSON object with this exact structure:
 {{
     "questions": [
         {{
             "id": 1,
-            "question": "Question text here",
+            "question": "Clear, specific question text (include code if testing practical knowledge)",
             "type": "multiple_choice",
             "options": ["Option A", "Option B", "Option C", "Option D"],
             "correct_answer": "Option A",
             "difficulty": "beginner|intermediate|advanced",
-            "topic": "specific topic this question covers"
+            "topic": "specific_topic_name"
         }}
     ],
-    "total_questions": 5,
+    "total_questions": 7,
     "subject": "{subject}"
 }}
 
-Ensure questions cover a range of topics and difficulty levels for comprehensive assessment.
+Create questions that effectively assess {subject} knowledge across all skill levels.
 """
         )
     
     def generate_survey(self, subject: str, rag_docs: List[str] = None) -> Dict[str, Any]:
         """Generate survey questions for a subject"""
-        logger.info(f"Generating survey for subject: {subject}")
+        logger.info(f"Generating LangChain survey for subject: {subject}")
         
-        rag_guidelines = "\n".join(rag_docs) if rag_docs else "Create clear, unambiguous questions with one correct answer."
+        # Load RAG documents if not provided
+        if not rag_docs:
+            rag_docs = self.load_rag_documents('survey', subject)
+        
+        # Prepare RAG guidelines
+        rag_guidelines = "\n".join(rag_docs) if rag_docs else self._get_default_survey_guidelines()
         
         chain = self.create_chain(output_parser=self.json_parser)
         
@@ -144,15 +161,99 @@ Ensure questions cover a range of topics and difficulty levels for comprehensive
             "rag_guidelines": rag_guidelines
         }
         
-        result = self.generate_with_retry(chain, inputs)
+        result = self.generate_with_retry(chain, inputs, max_attempts=3)
         
         # Validate output structure
         expected_keys = ["questions", "total_questions", "subject"]
         if not self.validate_output(result, expected_keys):
             raise ValueError("Generated survey does not have required structure")
         
-        logger.info(f"Successfully generated survey with {len(result.get('questions', []))} questions")
+        # Additional validation for survey quality
+        if not self._validate_survey_quality(result):
+            raise ValueError("Generated survey does not meet quality standards")
+        
+        # Add generation metadata
+        result['generated_at'] = self._get_current_timestamp()
+        result['generation_method'] = 'langchain'
+        result['model'] = 'grok-3-mini'
+        
+        logger.info(f"Successfully generated LangChain survey with {len(result.get('questions', []))} questions")
         return result
+    
+    def _get_default_survey_guidelines(self) -> str:
+        """Get default survey guidelines if RAG documents are not available"""
+        return """
+        Survey Requirements:
+        - Generate 7-8 multiple choice questions
+        - Difficulty distribution: 30% beginner, 50% intermediate, 20% advanced
+        - Each question has exactly 4 options
+        - Only one correct answer per question
+        - Cover fundamental topics for the subject
+        - Use clear, unambiguous language
+        - Base incorrect options on common misconceptions
+        """
+    
+    def _validate_survey_quality(self, survey: Dict[str, Any]) -> bool:
+        """Validate survey meets quality standards"""
+        questions = survey.get('questions', [])
+        
+        if not questions or len(questions) < 5 or len(questions) > 10:
+            logger.error(f"Invalid question count: {len(questions)}")
+            return False
+        
+        # Check each question structure
+        for i, question in enumerate(questions):
+            if not self._validate_question_quality(question, i + 1):
+                return False
+        
+        # Check difficulty distribution
+        difficulty_counts = {'beginner': 0, 'intermediate': 0, 'advanced': 0}
+        for question in questions:
+            difficulty = question.get('difficulty', '').lower()
+            if difficulty in difficulty_counts:
+                difficulty_counts[difficulty] += 1
+        
+        # Ensure we have questions of different difficulties
+        if difficulty_counts['beginner'] == 0 or difficulty_counts['intermediate'] == 0:
+            logger.error("Survey must have both beginner and intermediate questions")
+            return False
+        
+        logger.info(f"Survey quality validation passed: {difficulty_counts}")
+        return True
+    
+    def _validate_question_quality(self, question: Dict[str, Any], question_num: int) -> bool:
+        """Validate individual question quality"""
+        required_fields = ['id', 'question', 'type', 'options', 'correct_answer', 'difficulty', 'topic']
+        
+        for field in required_fields:
+            if field not in question:
+                logger.error(f"Question {question_num} missing field: {field}")
+                return False
+        
+        # Validate options
+        options = question.get('options', [])
+        if not isinstance(options, list) or len(options) != 4:
+            logger.error(f"Question {question_num} must have exactly 4 options")
+            return False
+        
+        # Validate correct answer
+        correct_answer = question.get('correct_answer')
+        if correct_answer not in options:
+            logger.error(f"Question {question_num} correct_answer must be one of the options")
+            return False
+        
+        # Validate difficulty
+        valid_difficulties = ['beginner', 'intermediate', 'advanced']
+        if question.get('difficulty', '').lower() not in valid_difficulties:
+            logger.error(f"Question {question_num} has invalid difficulty")
+            return False
+        
+        return True
+    
+    def _get_current_timestamp(self) -> str:
+        """Get current timestamp in ISO format"""
+        from datetime import datetime
+        return datetime.utcnow().isoformat() + 'Z'
 
 # Placeholder classes for the three-stage pipeline (to be implemented in subsequent subtasks)
 

@@ -1,320 +1,356 @@
+"""
+User data service for managing user-specific data storage and retrieval
+"""
+import os
+import json
+import logging
+from typing import Dict, Any, Optional, List
 from datetime import datetime
-from typing import Optional, Dict, List, Any
-from pathlib import Path
+from .file_service import FileService
 
-from .file_service import FileService, FileServiceError
-from .cache_service import cached, CacheTTL, CacheKeys
-
-
-class UserDataServiceError(Exception):
-    """Custom exception for user data service errors"""
-    pass
-
+logger = logging.getLogger(__name__)
 
 class UserDataService:
-    """Service for managing user-specific data files (selections, surveys, lessons)"""
+    """Service for managing user-specific data storage and retrieval"""
     
-    # File names for different data types
-    SELECTION_FILE = "selection.json"
-    SURVEY_FILE = "survey.json"
-    SURVEY_ANSWERS_FILE = "survey_answers.json"
-    LESSON_METADATA_FILE = "lesson_metadata.json"
-    
-    @classmethod
-    def save_user_selection(cls, user_id: str, subject: str) -> None:
-        """Save user's subject selection to selection.json"""
+    @staticmethod
+    def save_curriculum_scheme(user_id: str, subject: str, curriculum_data: Dict[str, Any]) -> bool:
+        """
+        Save curriculum scheme data for a user and subject
+        
+        Args:
+            user_id: User identifier
+            subject: Subject name
+            curriculum_data: Curriculum scheme data
+            
+        Returns:
+            True if saved successfully, False otherwise
+        """
         try:
-            # Ensure user directory exists
-            user_dir = FileService.ensure_user_directory(user_id)
-            selection_path = user_dir / cls.SELECTION_FILE
-            
-            selection_data = {
-                "selected_subject": subject,
-                "selected_at": datetime.utcnow().isoformat() + "Z"
-            }
-            
-            FileService.save_json(selection_path, selection_data)
-            
-        except FileServiceError as e:
-            raise UserDataServiceError(f"Failed to save user selection: {e}")
-    
-    @classmethod
-    @cached(ttl=CacheTTL.MEDIUM, key_prefix=CacheKeys.USER)
-    def load_user_selection(cls, user_id: str) -> Optional[Dict[str, Any]]:
-        """Load user's subject selection from selection.json"""
-        try:
-            user_dir = FileService.get_user_directory(user_id)
-            selection_path = user_dir / cls.SELECTION_FILE
-            
-            return FileService.load_json(selection_path)
-            
-        except FileServiceError as e:
-            raise UserDataServiceError(f"Failed to load user selection: {e}")
-    
-    @classmethod
-    def save_survey(cls, user_id: str, subject: str, survey_data: Dict[str, Any]) -> None:
-        """Save survey questions to survey.json"""
-        try:
-            # Validate survey data structure
-            if not isinstance(survey_data, dict):
-                raise UserDataServiceError("Survey data must be a dictionary")
-            
-            if "questions" not in survey_data:
-                raise UserDataServiceError("Survey data must contain 'questions' field")
-            
-            if not isinstance(survey_data["questions"], list):
-                raise UserDataServiceError("Survey questions must be a list")
-            
-            # Ensure subject directory exists
-            subject_dir = FileService.ensure_subject_directory(user_id, subject)
-            survey_path = subject_dir / cls.SURVEY_FILE
+            file_path = f"users/{user_id}/{subject}/curriculum_scheme.json"
             
             # Add metadata
-            survey_data_with_meta = {
-                **survey_data,
-                "generated_at": datetime.utcnow().isoformat() + "Z"
-            }
+            curriculum_data['saved_at'] = datetime.utcnow().isoformat() + 'Z'
+            curriculum_data['user_id'] = user_id
+            curriculum_data['subject'] = subject
             
-            FileService.save_json(survey_path, survey_data_with_meta)
+            FileService.save_json(file_path, curriculum_data)
+            logger.info(f"Curriculum scheme saved for user {user_id}, subject {subject}")
+            return True
             
-        except FileServiceError as e:
-            raise UserDataServiceError(f"Failed to save survey: {e}")
+        except Exception as e:
+            logger.error(f"Failed to save curriculum scheme for {user_id}/{subject}: {e}")
+            return False
     
-    @classmethod
-    @cached(ttl=CacheTTL.LONG, key_prefix=CacheKeys.SURVEY)
-    def load_survey(cls, user_id: str, subject: str) -> Optional[Dict[str, Any]]:
-        """Load survey questions from survey.json"""
+    @staticmethod
+    def load_curriculum_scheme(user_id: str, subject: str) -> Optional[Dict[str, Any]]:
+        """
+        Load curriculum scheme data for a user and subject
+        
+        Args:
+            user_id: User identifier
+            subject: Subject name
+            
+        Returns:
+            Curriculum scheme data or None if not found
+        """
         try:
-            subject_dir = FileService.get_subject_directory(user_id, subject)
-            survey_path = subject_dir / cls.SURVEY_FILE
+            file_path = f"users/{user_id}/{subject}/curriculum_scheme.json"
+            data = FileService.load_json(file_path)
             
-            return FileService.load_json(survey_path)
+            if data:
+                logger.debug(f"Curriculum scheme loaded for user {user_id}, subject {subject}")
             
-        except FileServiceError as e:
-            raise UserDataServiceError(f"Failed to load survey: {e}")
+            return data
+            
+        except Exception as e:
+            logger.error(f"Failed to load curriculum scheme for {user_id}/{subject}: {e}")
+            return None
     
-    @classmethod
-    def save_survey_answers(cls, user_id: str, subject: str, answers_data: Dict[str, Any]) -> None:
-        """Save survey answers to survey_answers.json"""
+    @staticmethod
+    def save_lesson_plans(user_id: str, subject: str, lesson_plans_data: Dict[str, Any]) -> bool:
+        """
+        Save lesson plans data for a user and subject
+        
+        Args:
+            user_id: User identifier
+            subject: Subject name
+            lesson_plans_data: Lesson plans data
+            
+        Returns:
+            True if saved successfully, False otherwise
+        """
         try:
-            # Validate answers data structure
-            if not isinstance(answers_data, dict):
-                raise UserDataServiceError("Survey answers data must be a dictionary")
-            
-            if "answers" not in answers_data:
-                raise UserDataServiceError("Survey answers data must contain 'answers' field")
-            
-            if not isinstance(answers_data["answers"], list):
-                raise UserDataServiceError("Survey answers must be a list")
-            
-            # Ensure subject directory exists
-            subject_dir = FileService.ensure_subject_directory(user_id, subject)
-            answers_path = subject_dir / cls.SURVEY_ANSWERS_FILE
+            file_path = f"users/{user_id}/{subject}/lesson_plans.json"
             
             # Add metadata
-            answers_data_with_meta = {
-                **answers_data,
-                "submitted_at": datetime.utcnow().isoformat() + "Z"
-            }
+            lesson_plans_data['saved_at'] = datetime.utcnow().isoformat() + 'Z'
+            lesson_plans_data['user_id'] = user_id
+            lesson_plans_data['subject'] = subject
             
-            FileService.save_json(answers_path, answers_data_with_meta)
+            FileService.save_json(file_path, lesson_plans_data)
+            logger.info(f"Lesson plans saved for user {user_id}, subject {subject}")
+            return True
             
-        except FileServiceError as e:
-            raise UserDataServiceError(f"Failed to save survey answers: {e}")
+        except Exception as e:
+            logger.error(f"Failed to save lesson plans for {user_id}/{subject}: {e}")
+            return False
     
-    @classmethod
-    def load_survey_answers(cls, user_id: str, subject: str) -> Optional[Dict[str, Any]]:
-        """Load survey answers from survey_answers.json"""
+    @staticmethod
+    def load_lesson_plans(user_id: str, subject: str) -> Optional[Dict[str, Any]]:
+        """
+        Load lesson plans data for a user and subject
+        
+        Args:
+            user_id: User identifier
+            subject: Subject name
+            
+        Returns:
+            Lesson plans data or None if not found
+        """
         try:
-            subject_dir = FileService.get_subject_directory(user_id, subject)
-            answers_path = subject_dir / cls.SURVEY_ANSWERS_FILE
+            file_path = f"users/{user_id}/{subject}/lesson_plans.json"
+            data = FileService.load_json(file_path)
             
-            return FileService.load_json(answers_path)
+            if data:
+                logger.debug(f"Lesson plans loaded for user {user_id}, subject {subject}")
             
-        except FileServiceError as e:
-            raise UserDataServiceError(f"Failed to load survey answers: {e}")
+            return data
+            
+        except Exception as e:
+            logger.error(f"Failed to load lesson plans for {user_id}/{subject}: {e}")
+            return None
     
-    @classmethod
-    def save_lesson_metadata(cls, user_id: str, subject: str, metadata: Dict[str, Any]) -> None:
-        """Save lesson metadata to lesson_metadata.json"""
+    @staticmethod
+    def save_lesson_content(user_id: str, subject: str, lesson_id: int, content: str) -> bool:
+        """
+        Save lesson content for a specific lesson
+        
+        Args:
+            user_id: User identifier
+            subject: Subject name
+            lesson_id: Lesson identifier
+            content: Lesson content (markdown)
+            
+        Returns:
+            True if saved successfully, False otherwise
+        """
         try:
-            # Validate metadata structure
-            if not isinstance(metadata, dict):
-                raise UserDataServiceError("Lesson metadata must be a dictionary")
+            file_path = f"users/{user_id}/{subject}/lesson_{lesson_id}.md"
             
-            if "lessons" not in metadata:
-                raise UserDataServiceError("Lesson metadata must contain 'lessons' field")
+            # Add metadata header to content
+            metadata_header = f"""---
+user_id: {user_id}
+subject: {subject}
+lesson_id: {lesson_id}
+generated_at: {datetime.utcnow().isoformat()}Z
+generation_method: langchain
+---
+
+"""
             
-            if not isinstance(metadata["lessons"], list):
-                raise UserDataServiceError("Lessons must be a list")
+            full_content = metadata_header + content
+            FileService.save_markdown(file_path, full_content)
             
-            # Validate each lesson entry
-            for i, lesson in enumerate(metadata["lessons"]):
-                if not isinstance(lesson, dict):
-                    raise UserDataServiceError(f"Lesson {i} must be a dictionary")
-                
-                required_fields = ["id", "title", "difficulty"]
-                for field in required_fields:
-                    if field not in lesson:
-                        raise UserDataServiceError(f"Lesson {i} missing required field: {field}")
+            logger.info(f"Lesson {lesson_id} content saved for user {user_id}, subject {subject}")
+            return True
             
-            # Ensure subject directory exists
-            subject_dir = FileService.ensure_subject_directory(user_id, subject)
-            metadata_path = subject_dir / cls.LESSON_METADATA_FILE
+        except Exception as e:
+            logger.error(f"Failed to save lesson {lesson_id} content for {user_id}/{subject}: {e}")
+            return False
+    
+    @staticmethod
+    def load_lesson_content(user_id: str, subject: str, lesson_id: int) -> Optional[str]:
+        """
+        Load lesson content for a specific lesson
+        
+        Args:
+            user_id: User identifier
+            subject: Subject name
+            lesson_id: Lesson identifier
+            
+        Returns:
+            Lesson content or None if not found
+        """
+        try:
+            file_path = f"users/{user_id}/{subject}/lesson_{lesson_id}.md"
+            content = FileService.load_markdown(file_path)
+            
+            if content:
+                logger.debug(f"Lesson {lesson_id} content loaded for user {user_id}, subject {subject}")
+            
+            return content
+            
+        except Exception as e:
+            logger.error(f"Failed to load lesson {lesson_id} content for {user_id}/{subject}: {e}")
+            return None
+    
+    @staticmethod
+    def load_survey_answers(user_id: str, subject: str) -> Optional[Dict[str, Any]]:
+        """
+        Load survey answers for a user and subject
+        
+        Args:
+            user_id: User identifier
+            subject: Subject name
+            
+        Returns:
+            Survey answers data or None if not found
+        """
+        try:
+            file_path = f"users/{user_id}/{subject}/survey_answers.json"
+            data = FileService.load_json(file_path)
+            
+            if data:
+                logger.debug(f"Survey answers loaded for user {user_id}, subject {subject}")
+            
+            return data
+            
+        except Exception as e:
+            logger.error(f"Failed to load survey answers for {user_id}/{subject}: {e}")
+            return None
+    
+    @staticmethod
+    def save_generation_status(user_id: str, subject: str, status_data: Dict[str, Any]) -> bool:
+        """
+        Save generation status for tracking pipeline progress
+        
+        Args:
+            user_id: User identifier
+            subject: Subject name
+            status_data: Status data
+            
+        Returns:
+            True if saved successfully, False otherwise
+        """
+        try:
+            file_path = f"users/{user_id}/{subject}/generation_status.json"
             
             # Add metadata
-            metadata_with_meta = {
-                **metadata,
-                "generated_at": datetime.utcnow().isoformat() + "Z"
-            }
+            status_data['updated_at'] = datetime.utcnow().isoformat() + 'Z'
+            status_data['user_id'] = user_id
+            status_data['subject'] = subject
             
-            FileService.save_json(metadata_path, metadata_with_meta)
+            FileService.save_json(file_path, status_data)
+            logger.debug(f"Generation status saved for user {user_id}, subject {subject}")
+            return True
             
-        except FileServiceError as e:
-            raise UserDataServiceError(f"Failed to save lesson metadata: {e}")
+        except Exception as e:
+            logger.error(f"Failed to save generation status for {user_id}/{subject}: {e}")
+            return False
     
-    @classmethod
-    def load_lesson_metadata(cls, user_id: str, subject: str) -> Optional[Dict[str, Any]]:
-        """Load lesson metadata from lesson_metadata.json"""
+    @staticmethod
+    def load_generation_status(user_id: str, subject: str) -> Optional[Dict[str, Any]]:
+        """
+        Load generation status for a user and subject
+        
+        Args:
+            user_id: User identifier
+            subject: Subject name
+            
+        Returns:
+            Generation status data or None if not found
+        """
         try:
-            subject_dir = FileService.get_subject_directory(user_id, subject)
-            metadata_path = subject_dir / cls.LESSON_METADATA_FILE
+            file_path = f"users/{user_id}/{subject}/generation_status.json"
+            data = FileService.load_json(file_path)
             
-            return FileService.load_json(metadata_path)
+            if data:
+                logger.debug(f"Generation status loaded for user {user_id}, subject {subject}")
             
-        except FileServiceError as e:
-            raise UserDataServiceError(f"Failed to load lesson metadata: {e}")
+            return data
+            
+        except Exception as e:
+            logger.error(f"Failed to load generation status for {user_id}/{subject}: {e}")
+            return None
     
-    @classmethod
-    def save_lesson_content(cls, user_id: str, subject: str, lesson_id: int, content: str) -> None:
-        """Save lesson content as markdown file"""
+    @staticmethod
+    def list_user_subjects(user_id: str) -> List[str]:
+        """
+        List all subjects for a user
+        
+        Args:
+            user_id: User identifier
+            
+        Returns:
+            List of subject names
+        """
         try:
-            if not isinstance(lesson_id, int) or lesson_id < 1:
-                raise UserDataServiceError("Lesson ID must be a positive integer")
-            
-            if not isinstance(content, str):
-                raise UserDataServiceError("Lesson content must be a string")
-            
-            # Ensure subject directory exists
-            subject_dir = FileService.ensure_subject_directory(user_id, subject)
-            lesson_path = subject_dir / f"lesson_{lesson_id}.md"
-            
-            FileService.save_markdown(lesson_path, content)
-            
-        except FileServiceError as e:
-            raise UserDataServiceError(f"Failed to save lesson content: {e}")
-    
-    @classmethod
-    @cached(ttl=CacheTTL.VERY_LONG, key_prefix=CacheKeys.LESSON)
-    def load_lesson_content(cls, user_id: str, subject: str, lesson_id: int) -> Optional[str]:
-        """Load lesson content from markdown file"""
-        try:
-            if not isinstance(lesson_id, int) or lesson_id < 1:
-                raise UserDataServiceError("Lesson ID must be a positive integer")
-            
-            subject_dir = FileService.get_subject_directory(user_id, subject)
-            lesson_path = subject_dir / f"lesson_{lesson_id}.md"
-            
-            return FileService.load_markdown(lesson_path)
-            
-        except FileServiceError as e:
-            raise UserDataServiceError(f"Failed to load lesson content: {e}")
-    
-    @classmethod
-    def get_user_subjects(cls, user_id: str) -> List[str]:
-        """Get list of subjects for which user has data"""
-        try:
-            user_dir = FileService.get_user_directory(user_id)
-            
-            if not user_dir.exists():
+            user_dir = f"users/{user_id}"
+            if not os.path.exists(user_dir):
                 return []
             
             subjects = []
-            for item in user_dir.iterdir():
-                if item.is_dir() and item.name not in ['.', '..']:
-                    # Validate subject name
-                    try:
-                        FileService._validate_subject(item.name)
-                        subjects.append(item.name)
-                    except FileServiceError:
-                        # Skip invalid directory names
-                        continue
+            for item in os.listdir(user_dir):
+                item_path = os.path.join(user_dir, item)
+                if os.path.isdir(item_path) and item != '__pycache__':
+                    subjects.append(item)
             
-            return sorted(subjects)
+            logger.debug(f"Found {len(subjects)} subjects for user {user_id}")
+            return subjects
             
-        except FileServiceError as e:
-            raise UserDataServiceError(f"Failed to get user subjects: {e}")
+        except Exception as e:
+            logger.error(f"Failed to list subjects for user {user_id}: {e}")
+            return []
     
-    @classmethod
-    def get_lesson_files(cls, user_id: str, subject: str) -> List[int]:
-        """Get list of lesson IDs that have content files"""
-        try:
-            subject_dir = FileService.get_subject_directory(user_id, subject)
+    @staticmethod
+    def list_user_lessons(user_id: str, subject: str) -> List[int]:
+        """
+        List all lesson IDs for a user and subject
+        
+        Args:
+            user_id: User identifier
+            subject: Subject name
             
-            if not subject_dir.exists():
+        Returns:
+            List of lesson IDs
+        """
+        try:
+            subject_dir = f"users/{user_id}/{subject}"
+            if not os.path.exists(subject_dir):
                 return []
             
             lesson_ids = []
-            for item in subject_dir.iterdir():
-                if item.is_file() and item.name.startswith("lesson_") and item.name.endswith(".md"):
+            for filename in os.listdir(subject_dir):
+                if filename.startswith('lesson_') and filename.endswith('.md'):
                     try:
-                        # Extract lesson ID from filename
-                        lesson_id_str = item.name[7:-3]  # Remove "lesson_" and ".md"
-                        lesson_id = int(lesson_id_str)
+                        lesson_id = int(filename.replace('lesson_', '').replace('.md', ''))
                         lesson_ids.append(lesson_id)
                     except ValueError:
-                        # Skip files with invalid lesson ID format
                         continue
             
-            return sorted(lesson_ids)
+            lesson_ids.sort()
+            logger.debug(f"Found {len(lesson_ids)} lessons for user {user_id}, subject {subject}")
+            return lesson_ids
             
-        except FileServiceError as e:
-            raise UserDataServiceError(f"Failed to get lesson files: {e}")
+        except Exception as e:
+            logger.error(f"Failed to list lessons for {user_id}/{subject}: {e}")
+            return []
     
-    @classmethod
-    def delete_user_data(cls, user_id: str) -> None:
-        """Delete all data for a user"""
-        try:
-            user_dir = FileService.get_user_directory(user_id)
+    @staticmethod
+    def delete_user_subject_data(user_id: str, subject: str) -> bool:
+        """
+        Delete all data for a user and subject
+        
+        Args:
+            user_id: User identifier
+            subject: Subject name
             
-            if user_dir.exists():
-                import shutil
-                shutil.rmtree(user_dir)
-                
-        except (FileServiceError, OSError) as e:
-            raise UserDataServiceError(f"Failed to delete user data: {e}")
-    
-    @classmethod
-    def delete_subject_data(cls, user_id: str, subject: str) -> None:
-        """Delete all data for a user's subject"""
+        Returns:
+            True if deleted successfully, False otherwise
+        """
         try:
-            subject_dir = FileService.get_subject_directory(user_id, subject)
+            import shutil
             
-            if subject_dir.exists():
-                import shutil
+            subject_dir = f"users/{user_id}/{subject}"
+            if os.path.exists(subject_dir):
                 shutil.rmtree(subject_dir)
-                
-        except (FileServiceError, OSError) as e:
-            raise UserDataServiceError(f"Failed to delete subject data: {e}")
-    
-    @classmethod
-    def save_subject_selection(cls, user_id: str, subject: str) -> bool:
-        """Save user's subject selection to selection.json (alias for save_user_selection)"""
-        try:
-            cls.save_user_selection(user_id, subject)
-            return True
-        except UserDataServiceError:
-            return False
-    
-    @classmethod
-    def has_subject_selection(cls, user_id: str, subject: str) -> bool:
-        """Check if user has selected a specific subject"""
-        try:
-            selection_data = cls.load_user_selection(user_id)
-            if not selection_data:
+                logger.info(f"Deleted all data for user {user_id}, subject {subject}")
+                return True
+            else:
+                logger.warning(f"No data found to delete for user {user_id}, subject {subject}")
                 return False
-            
-            return selection_data.get("selected_subject") == subject
-            
-        except UserDataServiceError:
+                
+        except Exception as e:
+            logger.error(f"Failed to delete data for {user_id}/{subject}: {e}")
             return False

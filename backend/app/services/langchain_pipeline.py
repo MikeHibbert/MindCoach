@@ -153,9 +153,6 @@ class LangChainPipelineService:
         except Exception as e:
             logger.error(f"Full pipeline failed for {subject}: {e}")
             raise
-        except Exception as e:
-            logger.error(f"Full pipeline failed for {subject}: {e}")
-            raise
     
     def get_pipeline_status(self) -> Dict[str, Any]:
         """Get the current status of pipeline components"""
