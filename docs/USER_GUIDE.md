@@ -351,11 +351,20 @@ Survey Complete → AI Curriculum Design (1-2min) → AI Lesson Planning (2-3min
 
 #### Lesson Viewer Interface
 
+##### Enhanced LangChain Features
+- **Curriculum Overview**: Interactive display of your complete learning path with course structure and learning objectives
+- **Lesson Plan Preview**: Detailed preview of lesson structure, activities, and learning objectives before starting
+- **AI-Generated Content Indicators**: Visual indicators showing content created by AI for personalized learning
+- **Real-Time Content Generation**: Integrated pipeline progress tracker for generating new content when needed
+- **Smart Navigation**: Enhanced lesson navigation using curriculum scheme data for better learning flow
+
 ##### Desktop Layout (1024px+)
-- **Sidebar Navigation**: Quick access to all lessons
-- **Main Content Area**: Full lesson content with proper typography
-- **Progress Panel**: Completion status and next lesson suggestions
+- **Enhanced Sidebar Navigation**: Quick access to all lessons with curriculum overview and lesson plan preview buttons
+- **Main Content Area**: Full lesson content with proper typography and AI-generated content indicators
+- **Progress Panel**: Completion status and next lesson suggestions with curriculum-aware recommendations
 - **Code Highlighting**: Syntax highlighting for all code examples
+- **Curriculum Panel**: Expandable curriculum overview showing course structure and learning objectives
+- **Lesson Plan Panel**: Detailed lesson plan preview with structure, objectives, and activities
 
 ##### Tablet Layout (768px-1023px)
 - **Stacked Layout**: Navigation above content
@@ -368,6 +377,37 @@ Survey Complete → AI Curriculum Design (1-2min) → AI Lesson Planning (2-3min
 - **Bottom Navigation**: Easy thumb access to controls
 - **Readable Typography**: Optimized font sizes and line spacing
 - **Minimal Interface**: Focus on content with reduced distractions
+
+### Enhanced Learning Features
+
+#### Curriculum Overview
+The curriculum overview provides a comprehensive view of your personalized learning path:
+
+- **Course Details**: Subject, skill level, and total number of lessons
+- **Learning Objectives**: Clear goals for what you'll achieve by completing the course
+- **Interactive Lesson Map**: Visual representation of all lessons with completion status
+- **Progress Tracking**: Visual indicators showing completed, current, and upcoming lessons
+- **Smart Navigation**: Click any lesson to jump directly to it
+- **Difficulty Indicators**: Visual cues showing the complexity of each lesson
+
+#### Lesson Plan Preview
+Before starting each lesson, you can preview the detailed lesson plan:
+
+- **Learning Objectives**: Specific goals for the current lesson
+- **Lesson Structure**: Breakdown of lesson sections with time estimates
+- **Activities**: Overview of hands-on exercises and practical activities
+- **Prerequisites**: Required knowledge from previous lessons
+- **Estimated Duration**: Expected time to complete the lesson
+
+#### Content Generation Workflow
+When you need new content or haven't generated lessons yet:
+
+1. **Automatic Detection**: System detects when content generation is needed
+2. **Pipeline Initiation**: Start the AI-powered content generation process
+3. **Real-Time Progress**: Watch as AI creates your personalized curriculum, lesson plans, and content
+4. **Stage Visualization**: See progress through curriculum generation → lesson planning → content creation
+5. **Completion Notification**: Get notified when your personalized lessons are ready
+6. **Seamless Transition**: Automatically navigate to your new lessons when generation completes
 
 ### Lesson Content Structure
 

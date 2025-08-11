@@ -76,6 +76,20 @@ graph TB
 - **API Integration**: Axios for HTTP requests with error handling
 - **Accessibility**: WCAG 2.1 AA compliance with screen reader support
 
+##### Core Components
+- **LessonViewer**: Enhanced lesson interface with curriculum and lesson plan integration
+- **PipelineProgressTracker**: Real-time progress tracking for LangChain content generation
+- **SubjectSelector**: Subject selection with subscription management
+- **Survey**: Dynamic survey generation and completion interface
+- **RAGDocumentManager**: Administrative interface for RAG document management
+
+##### LangChain Integration Components
+- **PipelineService**: Service layer for LangChain pipeline API integration
+- **Curriculum Overview**: Interactive display of personalized learning paths
+- **Lesson Plan Preview**: Detailed lesson structure and objectives preview
+- **Progress Visualization**: Three-stage pipeline progress with error handling
+- **Content Generation Workflow**: Seamless integration of AI-powered content creation
+
 #### Backend Services
 - **Flask API**: RESTful API with blueprint-based organization
 - **Authentication**: User ID-based authentication with JWT planned
