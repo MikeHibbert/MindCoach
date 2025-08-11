@@ -89,7 +89,7 @@ graph TB
 - **Redis Cache**: Session storage and task queue management#
 # LangChain Pipeline Architecture
 
-The content generation system uses a sophisticated three-stage LangChain pipeline powered by Grok-3 Mini via xAI's API.
+The content generation system uses a sophisticated three-stage LangChain pipeline powered by Grok-3 Mini via xAI's API, with comprehensive orchestration, progress tracking, and error handling.
 
 ### Pipeline Overview
 
@@ -97,34 +97,45 @@ The content generation system uses a sophisticated three-stage LangChain pipelin
 sequenceDiagram
     participant U as User
     participant API as Flask API
-    participant C as Celery Worker
+    participant PO as Pipeline Orchestrator
     participant L1 as Stage 1: Curriculum
     participant L2 as Stage 2: Lesson Plans
     participant L3 as Stage 3: Content
     participant G as Grok-3 Mini API
-    participant FS as File System
+    participant UDS as User Data Service
+    participant RAG as RAG Documents
 
-    U->>API: Submit Survey Answers
-    API->>C: Queue Content Generation Task
-    C->>L1: Start Curriculum Generation
-    L1->>G: Generate Curriculum Scheme
-    G-->>L1: Return Curriculum JSON
-    L1->>FS: Save curriculum_scheme.json
+    U->>API: POST /lessons/generate-langchain
+    API->>PO: start_full_pipeline()
+    PO->>PO: Initialize progress tracking
     
-    L1->>L2: Trigger Lesson Planning
-    L2->>G: Generate Lesson Plans
-    G-->>L2: Return Lesson Plans JSON
-    L2->>FS: Save lesson_plans.json
+    PO->>RAG: Load curriculum guidelines
+    PO->>L1: Generate curriculum scheme
+    L1->>G: Generate curriculum with RAG context
+    G-->>L1: Return curriculum JSON
+    L1->>UDS: Save curriculum_scheme.json
+    PO->>U: Progress update (33%)
     
-    L2->>L3: Trigger Content Generation
+    PO->>RAG: Load lesson plan templates
+    PO->>L2: Generate lesson plans
+    L2->>G: Generate detailed lesson plans
+    G-->>L2: Return lesson plans JSON
+    L2->>UDS: Save lesson_plans.json
+    PO->>U: Progress update (66%)
+    
+    PO->>RAG: Load content guidelines
     loop For Each Lesson
-        L3->>G: Generate Lesson Content
-        G-->>L3: Return Markdown Content
-        L3->>FS: Save lesson_N.md
+        PO->>L3: Generate lesson content
+        L3->>G: Generate markdown content
+        G-->>L3: Return lesson content
+        L3->>UDS: Save lesson_N.md
+        PO->>U: Progress update (66% + lesson progress)
     end
     
-    C-->>API: Pipeline Complete
-    API-->>U: Content Ready Notification
+    PO->>PO: Mark pipeline complete
+    PO->>U: Progress update (100%)
+    U->>API: GET /pipeline-status/{pipeline_id}
+    API-->>U: Pipeline completion status
 ```
 
 ### Stage 1: Curriculum Generation
@@ -135,66 +146,109 @@ sequenceDiagram
 - Survey answers and skill level assessment
 - Subject selection and prerequisites
 - User learning preferences and goals
+- RAG documents with curriculum guidelines
 
 **LangChain Implementation**:
 ```python
-from langchain.chains import LLMChain
-from langchain.prompts import PromptTemplate
-from langchain_community.llms import ChatGroq
+from app.services.langchain_chains import CurriculumGeneratorChain
+from app.services.langchain_base import XAILLM, JSONOutputParser
 
-class CurriculumGeneratorChain:
-    def __init__(self):
-        self.llm = ChatGroq(
-            model="grok-3-mini",
-            api_key=os.getenv('XAI_API_KEY'),
-            base_url=os.getenv('GROK_API_URL'),
-            temperature=0.7,
-            max_tokens=2000
-        )
-        
-        self.prompt = PromptTemplate(
-            input_variables=["survey_results", "subject", "skill_level", "rag_guidelines"],
+class CurriculumGeneratorChain(ContentGenerationChain):
+    """Chain for generating curriculum schemes (Stage 1)"""
+    
+    def get_prompt_template(self) -> PromptTemplate:
+        return PromptTemplate(
+            input_variables=["survey_results", "subject", "skill_level", "rag_guidelines", "known_topics"],
             template="""
-            Based on the following survey results for {subject}:
+            You are an expert educational curriculum designer. Create a comprehensive 10-lesson learning curriculum for {subject} based on the learner's assessment results.
+
+            LEARNER ASSESSMENT:
             {survey_results}
-            
-            User skill level: {skill_level}
-            
-            Create a comprehensive 10-lesson curriculum following these guidelines:
+
+            SKILL LEVEL: {skill_level}
+
+            CURRICULUM GUIDELINES:
             {rag_guidelines}
-            
-            Generate a JSON response with:
-            - Learning objectives
-            - Lesson topics and progression
-            - Prerequisites and dependencies
-            - Estimated time for each lesson
-            - Topics to skip based on user knowledge
-            
-            Format as valid JSON only.
+
+            TOPICS TO SKIP (learner already knows):
+            {known_topics}
+
+            REQUIREMENTS:
+            1. Create exactly 10 lessons that build progressively
+            2. Adapt difficulty and pacing based on the learner's skill level
+            3. Skip topics the learner already demonstrated knowledge of
+            4. Replace skipped beginner topics with more advanced material if skill level is higher
+            5. Each lesson should take 45-60 minutes to complete
+            6. Include clear learning objectives for the overall curriculum
+
+            Return your response as a JSON object with this exact structure:
+            {{
+                "curriculum": {{
+                    "subject": "{subject}",
+                    "skill_level": "{skill_level}",
+                    "total_lessons": 10,
+                    "learning_objectives": [
+                        "High-level learning goal 1",
+                        "High-level learning goal 2",
+                        "High-level learning goal 3"
+                    ],
+                    "topics": [
+                        {{
+                            "lesson_id": 1,
+                            "title": "Descriptive Lesson Title",
+                            "topics": ["topic1", "topic2", "topic3"],
+                            "prerequisites": ["previous_topic_if_any"],
+                            "difficulty": "beginner|intermediate|advanced",
+                            "estimated_duration": "45-60 minutes"
+                        }}
+                    ]
+                }},
+                "generated_at": "2024-01-15T10:00:00Z",
+                "generation_stage": "curriculum_complete"
+            }}
+
+            Ensure the curriculum provides a logical learning progression and covers all essential topics for {subject} at the {skill_level} level.
             """
         )
-        
-        self.chain = LLMChain(llm=self.llm, prompt=self.prompt)
     
-    def generate_curriculum(self, survey_data, subject, skill_level, rag_docs):
-        try:
-            response = self.chain.run(
-                survey_results=json.dumps(survey_data),
-                subject=subject,
-                skill_level=skill_level,
-                rag_guidelines=rag_docs['curriculum_guidelines']
-            )
-            
-            # Parse and validate JSON response
-            curriculum_data = json.loads(response)
-            return self._validate_curriculum_schema(curriculum_data)
-            
-        except Exception as e:
-            logger.error(f"Curriculum generation failed: {str(e)}")
-            raise ContentGenerationError(f"Failed to generate curriculum: {str(e)}")
+    def generate_curriculum(self, survey_data: Dict[str, Any], subject: str, rag_docs: List[str] = None) -> Dict[str, Any]:
+        """Generate curriculum scheme based on survey results"""
+        logger.info(f"Starting curriculum generation for {subject}")
+        
+        # Extract skill level from survey data
+        skill_level = survey_data.get('skill_level', 'intermediate')
+        
+        # Determine known topics from survey answers
+        known_topics = self._extract_known_topics(survey_data)
+        
+        # Prepare RAG guidelines
+        rag_guidelines = "\n".join(rag_docs) if rag_docs else "Create a comprehensive, well-structured curriculum with clear progression."
+        
+        # Format survey results for the prompt
+        survey_summary = self._format_survey_results(survey_data)
+        
+        chain = self.create_chain(output_parser=self.json_parser)
+        
+        inputs = {
+            "survey_results": survey_summary,
+            "subject": subject,
+            "skill_level": skill_level,
+            "rag_guidelines": rag_guidelines,
+            "known_topics": ", ".join(known_topics) if known_topics else "None identified"
+        }
+        
+        result = self.generate_with_retry(chain, inputs)
+        
+        # Validate output structure
+        expected_keys = ["curriculum"]
+        if not self.validate_output(result, expected_keys):
+            raise ValueError("Generated curriculum does not have required structure")
+        
+        logger.info(f"Successfully generated curriculum with {len(result.get('curriculum', {}).get('topics', []))} lessons for {subject}")
+        return result
 ```
 
-**Output**: `curriculum_scheme.json` with structured learning path
+**Output**: `curriculum_scheme.json` with structured learning path and metadata
 
 ### Stage 2: Lesson Planning
 
@@ -328,47 +382,162 @@ class ContentGeneratorChain:
 
 ### Pipeline Orchestration
 
-The pipeline is orchestrated using Celery for background processing:
+The pipeline is orchestrated using the `PipelineOrchestrator` class with comprehensive progress tracking, error handling, and recovery mechanisms:
 
 ```python
-@celery.task(bind=True, name='content_generation.generate_full_course')
-def generate_full_course(self, user_id, subject, survey_data):
-    """Main orchestration task for the three-stage pipeline"""
-    try:
-        # Stage 1: Generate Curriculum
-        self.update_state(state='PROGRESS', meta={'stage': 'curriculum', 'progress': 0})
-        curriculum_chain = CurriculumGeneratorChain()
-        curriculum_data = curriculum_chain.generate_curriculum(
-            survey_data, subject, survey_data['skill_level'], load_rag_documents('curriculum')
+from app.services.pipeline_orchestrator import PipelineOrchestrator, PipelineStage, PipelineStatus
+
+class PipelineOrchestrator:
+    """
+    Orchestrates the three-stage LangChain content generation pipeline
+    with progress tracking, error handling, and recovery mechanisms
+    """
+    
+    def __init__(self):
+        self.pipeline_service = LangChainPipelineService()
+        self.active_pipelines: Dict[str, PipelineProgress] = {}
+        self.progress_callbacks: Dict[str, List[Callable]] = {}
+    
+    def start_full_pipeline(
+        self, 
+        user_id: str, 
+        subject: str, 
+        survey_data: Dict[str, Any],
+        progress_callback: Optional[Callable] = None
+    ) -> str:
+        """Start the complete three-stage pipeline for a user and subject"""
+        pipeline_id = f"{user_id}_{subject}_{int(time.time())}"
+        
+        # Initialize progress tracking
+        progress = PipelineProgress(
+            user_id=user_id,
+            subject=subject,
+            current_stage=PipelineStage.CURRICULUM_GENERATION,
+            status=PipelineStatus.IN_PROGRESS,
+            progress_percentage=0.0,
+            stages_completed=0,
+            total_stages=3,
+            current_step="Initializing pipeline",
+            started_at=datetime.utcnow().isoformat() + 'Z'
         )
         
-        # Stage 2: Generate Lesson Plans
-        self.update_state(state='PROGRESS', meta={'stage': 'lesson_plans', 'progress': 33})
-        planner_chain = LessonPlannerChain()
-        lesson_plans_data = planner_chain.generate_lesson_plans(
-            curriculum_data, load_rag_documents('lesson_plans')
-        )
+        self.active_pipelines[pipeline_id] = progress
         
-        # Stage 3: Generate Content (parallel processing)
-        self.update_state(state='PROGRESS', meta={'stage': 'content', 'progress': 66})
-        content_chain = ContentGeneratorChain()
+        if progress_callback:
+            if pipeline_id not in self.progress_callbacks:
+                self.progress_callbacks[pipeline_id] = []
+            self.progress_callbacks[pipeline_id].append(progress_callback)
         
-        # Process lessons in parallel using Celery groups
-        from celery import group
-        content_tasks = group(
-            generate_lesson_content.s(user_id, subject, lesson_plan)
-            for lesson_plan in lesson_plans_data['lesson_plans']
-        )
+        try:
+            # Execute pipeline stages with progress tracking
+            self._execute_pipeline_stages(pipeline_id, survey_data)
+        except Exception as e:
+            logger.error(f"Pipeline {pipeline_id} failed: {e}")
+            progress.status = PipelineStatus.FAILED
+            progress.error_message = str(e)
+            self._notify_progress_update(pipeline_id)
+            raise
         
-        content_results = content_tasks.apply_async()
-        content_results.get()  # Wait for all content generation to complete
+        return pipeline_id
+    
+    def _execute_pipeline_stages(self, pipeline_id: str, survey_data: Dict[str, Any]):
+        """Execute all pipeline stages with progress tracking"""
+        progress = self.active_pipelines[pipeline_id]
+        user_id = progress.user_id
+        subject = progress.subject
         
-        self.update_state(state='SUCCESS', meta={'stage': 'complete', 'progress': 100})
-        return {'status': 'completed', 'lessons_generated': len(lesson_plans_data['lesson_plans'])}
-        
-    except Exception as exc:
-        self.update_state(state='FAILURE', meta={'error': str(exc)})
-        raise
+        try:
+            # Load RAG documents for all stages
+            rag_docs = self._load_all_rag_documents(subject)
+            
+            # Stage 1: Curriculum Generation
+            self._update_progress(
+                pipeline_id, 
+                PipelineStage.CURRICULUM_GENERATION,
+                "Generating curriculum scheme",
+                0.0
+            )
+            
+            curriculum_data = self.pipeline_service.generate_curriculum(
+                survey_data, subject, rag_docs.get('curriculum', [])
+            )
+            
+            # Save curriculum data
+            UserDataService.save_curriculum_scheme(user_id, subject, curriculum_data)
+            
+            self._update_progress(
+                pipeline_id,
+                PipelineStage.CURRICULUM_GENERATION,
+                "Curriculum generation completed",
+                33.3,
+                stages_completed=1
+            )
+            
+            # Stage 2: Lesson Planning
+            self._update_progress(
+                pipeline_id,
+                PipelineStage.LESSON_PLANNING,
+                "Creating detailed lesson plans",
+                33.3
+            )
+            
+            lesson_plans_data = self.pipeline_service.generate_lesson_plans(
+                curriculum_data, subject, rag_docs.get('lesson_plans', [])
+            )
+            
+            # Save lesson plans data
+            UserDataService.save_lesson_plans(user_id, subject, lesson_plans_data)
+            
+            self._update_progress(
+                pipeline_id,
+                PipelineStage.LESSON_PLANNING,
+                "Lesson planning completed",
+                66.6,
+                stages_completed=2
+            )
+            
+            # Stage 3: Content Generation
+            lesson_plans = lesson_plans_data.get('lesson_plans', [])
+            total_lessons = len(lesson_plans)
+            
+            for i, lesson_plan in enumerate(lesson_plans):
+                lesson_id = lesson_plan.get('lesson_id', i + 1)
+                
+                # Update progress for current lesson
+                lesson_progress = 66.6 + (33.3 * (i / total_lessons))
+                self._update_progress(
+                    pipeline_id,
+                    PipelineStage.CONTENT_GENERATION,
+                    f"Generating lesson {lesson_id} content ({i + 1}/{total_lessons})",
+                    lesson_progress
+                )
+                
+                # Generate lesson content
+                lesson_content = self.pipeline_service.generate_lesson_content(
+                    lesson_plan, subject, rag_docs.get('content', [])
+                )
+                
+                # Save lesson content
+                UserDataService.save_lesson_content(user_id, subject, lesson_id, lesson_content)
+            
+            # Pipeline completed successfully
+            self._update_progress(
+                pipeline_id,
+                PipelineStage.CONTENT_GENERATION,
+                "All content generation completed",
+                100.0,
+                stages_completed=3,
+                status=PipelineStatus.COMPLETED
+            )
+            
+            progress.completed_at = datetime.utcnow().isoformat() + 'Z'
+            
+        except Exception as e:
+            logger.error(f"Pipeline {pipeline_id} execution failed: {e}")
+            progress.status = PipelineStatus.FAILED
+            progress.error_message = str(e)
+            self._notify_progress_update(pipeline_id)
+            raise
 ```
 
 ### Error Handling and Retry Logic

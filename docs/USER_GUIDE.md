@@ -294,41 +294,52 @@ After submission, MindCoach analyzes your responses to determine:
 
 ## Lesson Generation and Learning
 
-### AI-Powered Content Generation
+### AI-Powered Content Generation with LangChain
 
-MindCoach uses a sophisticated three-stage pipeline to create personalized lessons:
+MindCoach uses an advanced LangChain-powered pipeline with xAI's Grok-3 Mini model to create highly personalized, intelligent lessons:
 
-#### Stage 1: Curriculum Generation
-- Creates a comprehensive learning scheme based on your survey results
-- Identifies 10 core lessons tailored to your skill level
-- Skips topics you've already mastered
-- Establishes learning progression and dependencies
+#### Stage 1: Curriculum Generation (AI-Powered)
+- **Intelligent Analysis**: AI analyzes your survey responses to understand your knowledge level
+- **Personalized Curriculum**: Creates a 10-lesson curriculum specifically tailored to your needs
+- **Smart Topic Selection**: Automatically skips topics you've mastered and focuses on knowledge gaps
+- **Progressive Learning Path**: Establishes logical learning progression with proper dependencies
+- **Adaptive Difficulty**: Adjusts content complexity based on your demonstrated skill level
 
-#### Stage 2: Lesson Planning
-- Develops detailed lesson plans for each curriculum topic
-- Defines learning objectives and outcomes
-- Plans activities, examples, and exercises
-- Structures content for optimal learning flow
+#### Stage 2: Lesson Planning (AI-Powered)
+- **Detailed Lesson Structure**: AI creates comprehensive lesson plans with specific learning objectives
+- **Time-Optimized Planning**: Each lesson designed for 45-60 minutes of focused learning
+- **Interactive Activities**: Plans engaging activities, demonstrations, and hands-on exercises
+- **Assessment Integration**: Includes assessment methods to track your progress
+- **Resource Planning**: Identifies materials and tools needed for each lesson
 
-#### Stage 3: Content Generation
-- Generates complete lesson content with explanations
-- Creates practical code examples relevant to your level
-- Develops hands-on exercises and challenges
-- Formats content for easy reading and comprehension
+#### Stage 3: Content Generation (AI-Powered)
+- **High-Quality Content**: AI generates complete lesson content with clear explanations
+- **Practical Examples**: Creates 2+ relevant code examples with detailed explanations
+- **Hands-On Exercises**: Develops 3-5 progressive exercises to reinforce learning
+- **Markdown Formatting**: Professional formatting with headers, code blocks, and lists
+- **Contextual Learning**: Content adapts to your skill level and learning preferences
 
-### Lesson Generation Progress
+### Real-Time Progress Tracking
 
-The content generation process takes 2-5 minutes depending on complexity:
+The LangChain pipeline provides detailed progress updates throughout the generation process:
 
 ```
-Survey Complete → Curriculum Generation (30s) → Lesson Planning (60s) → Content Generation (2-3min) → Lessons Ready
+Survey Complete → AI Curriculum Design (1-2min) → AI Lesson Planning (2-3min) → AI Content Creation (3-5min) → Lessons Ready
 ```
 
-#### Progress Indicators
-- **Stage Progress**: Shows current generation stage
-- **Overall Progress**: Percentage of total completion
-- **Lesson Count**: Number of lessons completed vs. total
-- **Estimated Time**: Remaining time for completion
+#### Enhanced Progress Indicators
+- **Real-Time Updates**: Live progress updates as AI generates your content
+- **Stage Visualization**: Clear indication of current AI processing stage
+- **Detailed Progress**: Percentage completion with estimated time remaining
+- **Lesson-by-Lesson Tracking**: See individual lesson generation progress
+- **Pipeline Status**: Monitor the health and status of your content generation
+- **Error Recovery**: Automatic retry mechanisms if generation encounters issues
+
+#### Pipeline Management Features
+- **Progress Monitoring**: Track your content generation in real-time
+- **Cancellation Option**: Cancel generation if needed (content generated so far is saved)
+- **Status Notifications**: Get notified when your personalized content is ready
+- **Quality Assurance**: AI-powered validation ensures high-quality, consistent content
 
 ### Accessing Your Lessons
 
@@ -476,19 +487,43 @@ MindCoach is designed to be fully accessible to users with diverse needs:
 2. Check for error messages near incomplete questions
 3. Try submitting again after a few seconds
 
-#### Lesson Generation Issues
+#### LangChain Pipeline Issues
 
-**Problem**: Lesson generation stuck or taking too long
+**Problem**: AI content generation taking longer than expected
 **Solution**:
-1. Wait up to 10 minutes for complex subjects
-2. Refresh the page to check if generation completed
-3. Restart generation process if needed
+1. Wait up to 15 minutes for complex subjects (AI processing takes time)
+2. Check pipeline status using the progress tracking feature
+3. Use the pipeline status endpoint to monitor real-time progress
+4. If stuck for over 15 minutes, cancel and restart the pipeline
 
-**Problem**: Generated lessons are too easy/difficult
+**Problem**: Pipeline failed or encountered an error
 **Solution**:
-1. Retake the assessment survey with more accurate answers
-2. Regenerate lessons with updated survey results
-3. Manually adjust difficulty in lesson settings
+1. Check the error message in the pipeline status
+2. Ensure you have completed the subject survey
+3. Verify your subscription is active for the subject
+4. Try restarting the pipeline - it will resume from the last successful stage
+5. Contact support if errors persist
+
+**Problem**: Generated content quality is inconsistent
+**Solution**:
+1. The AI uses your survey responses - ensure accurate answers
+2. Retake the assessment survey if your skill level has changed
+3. Check that RAG documents are properly loaded (technical issue)
+4. Regenerate content with updated survey results
+
+**Problem**: Pipeline status not updating
+**Solution**:
+1. Refresh the pipeline status page
+2. Check your internet connection stability
+3. The AI processing may be in a compute-intensive phase
+4. Wait a few minutes and check status again
+
+**Problem**: Cannot cancel running pipeline
+**Solution**:
+1. Ensure you're using the correct pipeline ID
+2. Try the cancel request again after a few seconds
+3. Pipeline may have completed between your request and cancellation
+4. Check pipeline status to confirm current state
 
 #### Content Display Issues
 
