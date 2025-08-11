@@ -8,6 +8,7 @@ const SubjectSelector = React.lazy(() => import('./components/SubjectSelector'))
 const Survey = React.lazy(() => import('./components/Survey'));
 const LessonViewer = React.lazy(() => import('./components/LessonViewer'));
 const PaymentGate = React.lazy(() => import('./components/PaymentGate'));
+const RAGDocumentManager = React.lazy(() => import('./components/RAGDocumentManager'));
 
 function App() {
   return (
@@ -20,6 +21,7 @@ function App() {
             <Route path="/subjects/:subject/lessons" element={<LessonViewer />} />
             <Route path="/subjects/:subject/lessons/:lessonId" element={<LessonViewer />} />
             <Route path="/payment/:subject" element={<PaymentGate />} />
+            <Route path="/admin/rag-documents" element={<RAGDocumentManager />} />
           </Routes>
         </Suspense>
       </ResponsiveLayout>

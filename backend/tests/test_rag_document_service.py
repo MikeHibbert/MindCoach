@@ -192,4 +192,138 @@ class TestRAGDocumentService:
         assert available["subjects"] == []
         
         stats = service.get_document_stats()
-        assert stats["path_exists"] is False
+        # Path exists now because service creates directories automatically
+        assert stats["path_exists"] is True
+    
+    def test_create_document_version(self, temp_rag_dir):
+        """Test creating new document versions"""
+        service = RAGDocumentService(temp_rag_dir)
+        
+        # Create a new version
+        new_content = "# Updated Content\n\nThis is version 2"
+        version = service.create_document_version(
+            "content_guidelines", 
+            new_content, 
+            "Updated content for testing",
+            "test_user"
+        )
+        
+        assert version == "1.1"
+        
+        # Verify new content is loaded
+        current_content = service.load_document("content_guidelines")
+        assert current_content == new_content
+        
+        # Verify version history
+        versions = service.get_document_versions("content_guidelines")
+        assert versions["current_version"] == "1.1"
+        assert "1.0" in versions["versions"]
+        assert "1.1" in versions["versions"]
+        assert versions["versions"]["1.1"]["author"] == "test_user"
+    
+    def test_load_document_version(self, temp_rag_dir):
+        """Test loading specific document versions"""
+        service = RAGDocumentService(temp_rag_dir)
+        
+        # Get original content
+        original_content = service.load_document("content_guidelines")
+        
+        # Create new version
+        new_content = "# Version 2 Content"
+        service.create_document_version("content_guidelines", new_content)
+        
+        # Load original version
+        v1_content = service.load_document_version("content_guidelines", "1.0")
+        assert v1_content == original_content
+        
+        # Load current version
+        v2_content = service.load_document_version("content_guidelines", "1.1")
+        assert v2_content == new_content
+    
+    def test_rollback_document(self, temp_rag_dir):
+        """Test rolling back to previous version"""
+        service = RAGDocumentService(temp_rag_dir)
+        
+        # Get original content
+        original_content = service.load_document("content_guidelines")
+        
+        # Create new version
+        new_content = "# Version 2 Content"
+        service.create_document_version("content_guidelines", new_content)
+        
+        # Verify new content is current
+        assert service.load_document("content_guidelines") == new_content
+        
+        # Rollback to version 1.0
+        success = service.rollback_document("content_guidelines", "1.0")
+        assert success is True
+        
+        # Verify rollback worked (should be version 1.2 with original content)
+        current_content = service.load_document("content_guidelines")
+        assert current_content == original_content
+        
+        versions = service.get_document_versions("content_guidelines")
+        assert versions["current_version"] == "1.2"
+    
+    def test_compare_document_versions(self, temp_rag_dir):
+        """Test comparing document versions"""
+        service = RAGDocumentService(temp_rag_dir)
+        
+        # Create new version with different content
+        new_content = "# Short content"
+        service.create_document_version("content_guidelines", new_content)
+        
+        # Compare versions
+        comparison = service.compare_document_versions("content_guidelines", "1.0", "1.1")
+        
+        assert comparison["version1"] == "1.0"
+        assert comparison["version2"] == "1.1"
+        assert comparison["identical"] is False
+        assert comparison["version2_length"] < comparison["version1_length"]  # New content is shorter
+    
+    def test_delete_document_version(self, temp_rag_dir):
+        """Test deleting document versions"""
+        service = RAGDocumentService(temp_rag_dir)
+        
+        # Create multiple versions
+        service.create_document_version("content_guidelines", "Version 2")
+        service.create_document_version("content_guidelines", "Version 3")
+        
+        # Cannot delete current version
+        success = service.delete_document_version("content_guidelines", "1.2")
+        assert success is False
+        
+        # Can delete old version
+        success = service.delete_document_version("content_guidelines", "1.0")
+        assert success is True
+        
+        # Verify version is gone
+        versions = service.get_document_versions("content_guidelines")
+        assert "1.0" not in versions["versions"]
+        assert "1.1" in versions["versions"]
+        assert "1.2" in versions["versions"]
+    
+    def test_subject_specific_versioning(self, temp_rag_dir):
+        """Test versioning for subject-specific documents"""
+        service = RAGDocumentService(temp_rag_dir)
+        
+        # Create new version for python templates
+        new_content = "# Updated Python Templates"
+        version = service.create_document_version(
+            "templates", 
+            new_content, 
+            "Updated Python templates",
+            "test_user",
+            "python"
+        )
+        
+        assert version == "1.1"
+        
+        # Verify subject-specific versioning
+        versions = service.get_document_versions("templates", "python")
+        assert versions["subject"] == "python"
+        assert versions["current_version"] == "1.1"
+        
+        # Load specific version
+        content = service.load_document_version("templates", "1.1", "python")
+        assert content == new_content

@@ -577,89 +577,146 @@ def call_grok_api(prompt, **kwargs):
 ```## 
 RAG Document System
 
-The Retrieval-Augmented Generation (RAG) system ensures consistent content quality and structure across all AI-generated materials.
+The Retrieval-Augmented Generation (RAG) system ensures consistent content quality and structure across all AI-generated materials. The system now includes comprehensive version management, validation, and administrative interfaces.
 
 ### RAG Document Structure
 
 ```
 rag_docs/
-├── curriculum/
-│   ├── curriculum_guidelines.md      # Overall curriculum structure
-│   ├── subject_templates/            # Subject-specific templates
-│   │   ├── python_curriculum.md
-│   │   ├── javascript_curriculum.md
-│   │   └── react_curriculum.md
-│   └── learning_progressions.md      # Skill level progressions
-├── lesson_plans/
-│   ├── lesson_structure_template.md  # Standard lesson format
-│   ├── activity_templates.md         # Interactive activity types
-│   └── assessment_methods.md         # Assessment strategies
-├── content/
-│   ├── content_quality_standards.md  # Writing and formatting standards
-│   ├── code_example_guidelines.md    # Code quality requirements
-│   └── exercise_templates.md         # Exercise design patterns
-└── survey/
-    ├── question_templates.md          # Survey question formats
-    └── assessment_criteria.md         # Skill evaluation methods
+├── content_guidelines.md             # Lesson content structure and quality standards
+├── survey_guidelines.md              # Survey question formats and assessment criteria
+├── curriculum_guidelines.md          # Curriculum structure and progression rules
+├── lesson_plan_guidelines.md         # Lesson plan templates and requirements
+├── subjects/                         # Subject-specific templates
+│   ├── python_templates.md          # Python-specific content guidelines
+│   ├── javascript_templates.md      # JavaScript-specific content guidelines
+│   └── react_templates.md           # React-specific content guidelines
+├── versions/                         # Version history storage
+│   ├── content_guidelines_v1.0.md   # Previous versions of documents
+│   ├── content_guidelines_v1.1.md
+│   └── ...
+├── metadata/                         # Version metadata and tracking
+│   ├── content_guidelines_metadata.json
+│   ├── survey_guidelines_metadata.json
+│   └── ...
+└── README.md                         # Documentation overview
 ```
+
+### RAG Document Management Features
+
+#### Version Control System
+- **Automatic Versioning**: Each document update creates a new version with incremental numbering
+- **Version Metadata**: Tracks author, timestamp, description, and content length for each version
+- **Rollback Capability**: Administrators can rollback to any previous version
+- **Version Comparison**: Compare content differences between any two versions
+- **Version Deletion**: Remove old versions (except current) to manage storage
+
+#### Administrative Interface
+- **Web-based Management**: React-based admin interface at `/admin/rag-documents`
+- **Document Editor**: In-browser markdown editor with syntax highlighting
+- **Real-time Validation**: Instant feedback on document structure and format
+- **Preview Mode**: Preview rendered content before saving
+- **Bulk Operations**: Manage multiple documents and versions efficiently
+
+#### Document Validation
+- **Structure Validation**: Ensures required sections and formatting are present
+- **Content Quality Checks**: Validates code examples, headers, and formatting standards
+- **Subject-specific Rules**: Different validation rules for different document types
+- **Automated Testing**: Integration tests verify document integrity
 
 ### RAG Document Implementation
 
-#### Loading RAG Documents
+#### RAG Document Service
+The `RAGDocumentService` provides comprehensive document management with versioning support:
+
 ```python
-import os
-import markdown
-from pathlib import Path
+from app.services.rag_document_service import RAGDocumentService
 
-class RAGDocumentLoader:
-    def __init__(self, rag_docs_path="rag_docs"):
-        self.rag_docs_path = Path(rag_docs_path)
-        self._cache = {}
-    
-    def load_document(self, doc_type, doc_name):
-        """Load a specific RAG document"""
-        cache_key = f"{doc_type}/{doc_name}"
-        
-        if cache_key in self._cache:
-            return self._cache[cache_key]
-        
-        doc_path = self.rag_docs_path / doc_type / f"{doc_name}.md"
-        
-        if not doc_path.exists():
-            raise FileNotFoundError(f"RAG document not found: {doc_path}")
-        
-        with open(doc_path, 'r', encoding='utf-8') as f:
-            content = f.read()
-        
-        # Cache the document
-        self._cache[cache_key] = content
-        return content
-    
-    def load_documents_for_stage(self, stage):
-        """Load all documents for a specific pipeline stage"""
-        stage_docs = {}
-        stage_path = self.rag_docs_path / stage
-        
-        if not stage_path.exists():
-            return stage_docs
-        
-        for doc_file in stage_path.glob("*.md"):
-            doc_name = doc_file.stem
-            with open(doc_file, 'r', encoding='utf-8') as f:
-                stage_docs[doc_name] = f.read()
-        
-        return stage_docs
-    
-    def reload_cache(self):
-        """Clear cache to reload documents"""
-        self._cache.clear()
+# Initialize service
+rag_service = RAGDocumentService("rag_docs")
 
-# Global RAG loader instance
-rag_loader = RAGDocumentLoader()
+# Load current document
+content = rag_service.load_document("content_guidelines")
 
-def load_rag_documents(stage):
-    """Convenience function to load RAG documents for a pipeline stage"""
-    return rag_loader.load_documents_for_stage(stage)
+# Load subject-specific document
+python_templates = rag_service.load_document("templates", "python")
+
+# Load documents for pipeline stage
+survey_docs = rag_service.load_documents_for_stage("survey", "python")
+
+# Create new version
+new_version = rag_service.create_document_version(
+    "content_guidelines",
+    updated_content,
+    "Added new exercise guidelines",
+    "admin_user"
+)
+
+# Get version history
+versions = rag_service.get_document_versions("content_guidelines")
+
+# Rollback to previous version
+success = rag_service.rollback_document("content_guidelines", "1.0")
+
+# Validate document structure
+validation = rag_service.validate_document_structure("content_guidelines", content)
+```
+
+#### Version Management API
+```python
+# Create new document version
+POST /api/rag-docs/{doc_type}/versions
+{
+    "content": "# Updated Content...",
+    "description": "Added new guidelines",
+    "author": "admin_user"
+}
+
+# Get version history
+GET /api/rag-docs/{doc_type}/versions
+
+# Load specific version
+GET /api/rag-docs/{doc_type}/versions/{version}
+
+# Rollback to previous version
+POST /api/rag-docs/{doc_type}/rollback
+{
+    "target_version": "1.0"
+}
+
+# Compare versions
+POST /api/rag-docs/{doc_type}/versions/compare
+{
+    "version1": "1.0",
+    "version2": "1.1"
+}
+```
+
+#### Document Validation System
+```python
+def validate_document_structure(doc_type, content):
+    """Validate document structure and content"""
+    validation_results = {
+        'has_content': bool(content.strip()),
+        'has_headers': '##' in content,
+        'has_examples': '```' in content,
+        'proper_format': True
+    }
+    
+    # Document-specific validations
+    if doc_type == 'content_guidelines':
+        validation_results['has_lesson_structure'] = 'Lesson Structure Template' in content
+        validation_results['has_exercise_format'] = 'Exercise' in content
+    
+    elif doc_type == 'survey_guidelines':
+        validation_results['has_question_format'] = 'multiple_choice' in content
+        validation_results['has_difficulty_levels'] = all(
+            level in content for level in ['beginner', 'intermediate', 'advanced']
+        )
+    
+    # Overall validation
+    validation_results['is_valid'] = all(validation_results.values())
+    return validation_results
 ```
 
 #### Sample RAG Documents
