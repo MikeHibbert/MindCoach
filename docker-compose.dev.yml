@@ -1,0 +1,291 @@
+version: '3.8'
+
+# Development Docker Compose configuration with hot reloading
+services:
+  # Frontend development server with hot reloading
+  frontend-dev:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    container_name: mindcoach-frontend-dev
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - ./logs/frontend:/app/logs
+    environment:
+      - REACT_APP_API_BASE_URL=http://localhost:5000/api
+      - REACT_APP_ENVIRONMENT=development
+      - REACT_APP_ENABLE_CACHE=false
+      - REACT_APP_ENABLE_ANALYTICS=false
+      - CHOKIDAR_USEPOLLING=true
+      - WATCHPACK_POLLING=true
+      - FAST_REFRESH=true
+    stdin_open: true
+    tty: true
+    restart: unless-stopped
+    networks:
+      - mindcoach-dev-network
+    depends_on:
+      - backend-dev
+
+  # Backend development server with hot reloading
+  backend-dev:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    container_name: mindcoach-backend-dev
+    ports:
+      - "5000:5000"
+      - "5678:5678"  # Debugger port
+    volumes:
+      - ./backend:/app
+      - ./data:/app/data
+      - ./users:/app/users
+      - ./logs/backend:/app/logs
+    environment:
+      - FLASK_ENV=development
+      - FLASK_DEBUG=1
+      - SECRET_KEY=dev-secret-key-change-in-production
+      - DATABASE_URL=postgresql://postgres:devpassword@postgres-dev:5432/mindcoach_dev
+      - REDIS_URL=redis://redis-dev:6379/0
+      - CELERY_BROKER_URL=redis://redis-dev:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis-dev:6379/0
+      - CORS_ORIGINS=http://localhost:3000,http://localhost:8080
+      - LOG_LEVEL=DEBUG
+      - PYTHONPATH=/app
+      - PYTHONUNBUFFERED=1
+      - XAI_API_KEY=${XAI_API_KEY:-dev-api-key}
+      - GROK_API_URL=${GROK_API_URL:-http://mock-api-dev:8000}
+    restart: unless-stopped
+    networks:
+      - mindcoach-dev-network
+    depends_on:
+      - postgres-dev
+      - redis-dev
+    command: >
+      sh -c "
+        echo 'Waiting for database...' &&
+        sleep 10 &&
+        echo 'Starting development server with hot reloading...' &&
+        python -m debugpy --listen 0.0.0.0:5678 --wait-for-client run.py
+      "
+
+  # PostgreSQL for development
+  postgres-dev:
+    image: postgres:15-alpine
+    container_name: mindcoach-postgres-dev
+    environment:
+      - POSTGRES_DB=mindcoach_dev
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=devpassword
+      - POSTGRES_HOST_AUTH_METHOD=trust
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres-dev-data:/var/lib/postgresql/data
+      - ./postgres/init-dev.sql:/docker-entrypoint-initdb.d/init-dev.sql:ro
+      - ./logs/postgres:/var/log/postgresql
+    restart: unless-stopped
+    networks:
+      - mindcoach-dev-network
+    command: postgres -c log_statement=all -c log_destination=stderr
+
+  # Redis for development
+  redis-dev:
+    image: redis:7-alpine
+    container_name: mindcoach-redis-dev
+    ports:
+      - "6380:6379"
+    volumes:
+      - redis-dev-data:/data
+      - ./logs/redis:/var/log/redis
+    command: >
+      redis-server 
+      --appendonly yes 
+      --maxmemory 128mb 
+      --maxmemory-policy allkeys-lru
+      --loglevel debug
+    restart: unless-stopped
+    networks:
+      - mindcoach-dev-network
+
+  # Celery worker for development
+  celery-worker-dev:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    container_name: mindcoach-celery-worker-dev
+    volumes:
+      - ./backend:/app
+      - ./data:/app/data
+      - ./users:/app/users
+      - ./logs/celery:/app/logs
+    environment:
+      - FLASK_ENV=development
+      - SECRET_KEY=dev-secret-key-change-in-production
+      - DATABASE_URL=postgresql://postgres:devpassword@postgres-dev:5432/mindcoach_dev
+      - REDIS_URL=redis://redis-dev:6379/0
+      - CELERY_BROKER_URL=redis://redis-dev:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis-dev:6379/0
+      - LOG_LEVEL=DEBUG
+      - PYTHONPATH=/app
+      - PYTHONUNBUFFERED=1
+      - XAI_API_KEY=${XAI_API_KEY:-dev-api-key}
+      - GROK_API_URL=${GROK_API_URL:-http://mock-api-dev:8000}
+    command: >
+      sh -c "
+        echo 'Waiting for Redis...' &&
+        sleep 15 &&
+        echo 'Starting Celery worker with auto-reload...' &&
+        watchmedo auto-restart --directory=/app --pattern='*.py' --recursive -- celery -A app.celery worker --loglevel=debug --concurrency=2
+      "
+    depends_on:
+      - redis-dev
+      - postgres-dev
+    restart: unless-stopped
+    networks:
+      - mindcoach-dev-network
+
+  # Celery beat scheduler for development
+  celery-beat-dev:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    container_name: mindcoach-celery-beat-dev
+    volumes:
+      - ./backend:/app
+      - ./data:/app/data
+      - ./logs/celery:/app/logs
+    environment:
+      - FLASK_ENV=development
+      - SECRET_KEY=dev-secret-key-change-in-production
+      - DATABASE_URL=postgresql://postgres:devpassword@postgres-dev:5432/mindcoach_dev
+      - REDIS_URL=redis://redis-dev:6379/0
+      - CELERY_BROKER_URL=redis://redis-dev:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis-dev:6379/0
+      - LOG_LEVEL=DEBUG
+      - PYTHONPATH=/app
+      - PYTHONUNBUFFERED=1
+    command: >
+      sh -c "
+        echo 'Waiting for Redis...' &&
+        sleep 20 &&
+        echo 'Starting Celery beat scheduler...' &&
+        celery -A app.celery beat --loglevel=debug
+      "
+    depends_on:
+      - redis-dev
+      - postgres-dev
+    restart: unless-stopped
+    networks:
+      - mindcoach-dev-network
+
+  # Mock API for development testing
+  mock-api-dev:
+    image: wiremock/wiremock:latest
+    container_name: mindcoach-mock-api-dev
+    ports:
+      - "8000:8080"
+    volumes:
+      - ./dev-mocks:/home/wiremock
+      - ./logs/mock-api:/var/log/wiremock
+    command: --global-response-templating --verbose --root-dir /home/wiremock
+    restart: unless-stopped
+    networks:
+      - mindcoach-dev-network
+
+  # Development tools container
+  dev-tools:
+    build:
+      context: ./dev-tools
+      dockerfile: Dockerfile
+    container_name: mindcoach-dev-tools
+    ports:
+      - "8080:8080"  # Development dashboard
+      - "9090:9090"  # Prometheus
+      - "3001:3000"  # Grafana
+    volumes:
+      - ./dev-tools:/app
+      - ./logs:/app/logs
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      - NODE_ENV=development
+      - DOCKER_HOST=unix:///var/run/docker.sock
+    restart: unless-stopped
+    networks:
+      - mindcoach-dev-network
+    depends_on:
+      - backend-dev
+      - frontend-dev
+
+  # Database admin interface
+  pgadmin-dev:
+    image: dpage/pgadmin4:latest
+    container_name: mindcoach-pgadmin-dev
+    ports:
+      - "8081:80"
+    environment:
+      - PGADMIN_DEFAULT_EMAIL=dev@mindcoach.com
+      - PGADMIN_DEFAULT_PASSWORD=devpassword
+      - PGADMIN_CONFIG_SERVER_MODE=False
+    volumes:
+      - pgadmin-dev-data:/var/lib/pgadmin
+      - ./dev-tools/pgadmin-servers.json:/pgadmin4/servers.json:ro
+    depends_on:
+      - postgres-dev
+    restart: unless-stopped
+    networks:
+      - mindcoach-dev-network
+
+  # Redis admin interface
+  redis-commander-dev:
+    image: rediscommander/redis-commander:latest
+    container_name: mindcoach-redis-commander-dev
+    ports:
+      - "8082:8081"
+    environment:
+      - REDIS_HOSTS=local:redis-dev:6379
+      - HTTP_USER=dev
+      - HTTP_PASSWORD=devpassword
+    depends_on:
+      - redis-dev
+    restart: unless-stopped
+    networks:
+      - mindcoach-dev-network
+
+  # File watcher for automatic rebuilds
+  file-watcher:
+    build:
+      context: ./dev-tools
+      dockerfile: Dockerfile.watcher
+    container_name: mindcoach-file-watcher
+    volumes:
+      - ./:/workspace
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      - COMPOSE_PROJECT_NAME=${COMPOSE_PROJECT_NAME:-mindcoach}
+    command: >
+      sh -c "
+        echo 'Starting file watcher for automatic rebuilds...' &&
+        watchmedo auto-restart --directory=/workspace --pattern='Dockerfile*' --pattern='requirements*.txt' --pattern='package*.json' --recursive -- echo 'Files changed, triggering rebuild...'
+      "
+    restart: unless-stopped
+    networks:
+      - mindcoach-dev-network
+
+volumes:
+  postgres-dev-data:
+    driver: local
+  redis-dev-data:
+    driver: local
+  pgadmin-dev-data:
+    driver: local
+
+networks:
+  mindcoach-dev-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.21.0.0/16

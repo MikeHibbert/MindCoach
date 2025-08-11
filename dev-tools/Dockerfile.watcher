@@ -1,0 +1,22 @@
+# File watcher container for development
+FROM python:3.11-alpine
+
+# Install system dependencies
+RUN apk add --no-cache \
+    docker-cli \
+    bash \
+    curl
+
+# Install Python packages
+RUN pip install --no-cache-dir \
+    watchdog \
+    docker
+
+# Set working directory
+WORKDIR /app
+
+# Copy watcher script
+COPY watcher.py .
+
+# Default command
+CMD ["python", "watcher.py"]

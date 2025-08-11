@@ -19,6 +19,14 @@ MindCoach is an intelligent web application that creates customized learning exp
 - **Comprehensive Testing**: Unit, integration, and end-to-end testing with accessibility validation
 - **Docker Containerization**: Production-ready deployment with multi-service orchestration
 
+### Deployment and Scaling
+- **CI/CD Pipeline**: Automated testing, building, and deployment with GitHub Actions
+- **Horizontal Scaling**: Auto-scaling with load balancing and distributed session management
+- **Container Registry**: Multi-platform container builds with security scanning
+- **Development Environment**: Containerized development with hot reloading and debugging
+- **Performance Testing**: Load testing and scaling validation with comprehensive metrics
+- **Production Deployment**: Blue-green deployment with health checks and rollback capabilities
+
 ## Prerequisites
 
 Before setting up the development environment, ensure you have the following installed:
@@ -72,6 +80,31 @@ sudo usermod -aG docker $USER
 ```
 
 ## Quick Start Guide
+
+### Option 1: Docker Development Environment (Recommended)
+
+For the fastest setup with all services pre-configured:
+
+```bash
+# Clone the repository
+git clone <repository-url>
+cd personalized-learning-path-generator
+
+# Setup development environment
+./scripts/setup-dev.sh
+
+# Start all services
+./scripts/dev-start.sh
+```
+
+Access the application:
+- **Frontend**: http://localhost:3000
+- **Backend API**: http://localhost:5000
+- **Development Dashboard**: http://localhost:8080
+- **Database Admin**: http://localhost:8081
+- **Redis Admin**: http://localhost:8082
+
+### Option 2: Manual Setup
 
 ### 1. Clone the Repository
 ```bash
@@ -213,9 +246,59 @@ The frontend uses environment variables prefixed with `REACT_APP_`:
 | `REACT_APP_API_BASE_URL` | Backend API base URL | No | `http://localhost:5000` |
 | `REACT_APP_ENVIRONMENT` | Application environment | No | `development` |
 
+## Deployment and Scaling
+
+### Production Deployment
+
+```bash
+# Setup container registry
+./scripts/setup-registry.sh github
+
+# Build and push images
+./scripts/build-images.sh v1.0.0
+
+# Deploy to production
+./scripts/deploy-production.sh v1.0.0
+```
+
+### Horizontal Scaling
+
+```bash
+# Start scaled infrastructure
+docker-compose -f docker-compose.scale.yml up -d
+
+# Test scaling capabilities
+./scripts/test-scaling.sh 300 100 60
+
+# Monitor auto-scaling
+curl http://localhost:8080/status
+```
+
+### Development Environment Management
+
+```bash
+# Start development environment
+./scripts/dev-start.sh
+
+# Stop development environment
+./scripts/dev-stop.sh
+
+# Reset development environment
+./scripts/dev-reset.sh
+
+# View service logs
+docker-compose -f docker-compose.dev.yml logs -f [service]
+```
+
+For detailed deployment and scaling documentation, see:
+- [Deployment Infrastructure Guide](docs/DEPLOYMENT_INFRASTRUCTURE.md)
+- [Horizontal Scaling Guide](docs/SCALING_GUIDE.md)
+- [Development Setup Guide](docs/DEVELOPMENT_SETUP.md)
+
 ## Project Structure
 
 ```
+├── .github/workflows/              # CI/CD pipeline configuration
 ├── .kiro/                          # Kiro IDE configuration
 │   ├── hooks/                      # Git automation hooks
 │   └── specs/                      # Feature specifications
@@ -296,10 +379,29 @@ The frontend uses environment variables prefixed with `REACT_APP_`:
 │           ├── curriculum_scheme.json # Learning curriculum
 │           ├── lesson_plans.json # Detailed lesson plans
 │           └── lesson_*.md      # Generated lesson content
-├── docker-compose.yml           # Docker orchestration
-├── docker-compose.dev.yml       # Development Docker setup
-├── Dockerfile.backend           # Backend container definition
-├── Dockerfile.frontend          # Frontend container definition
+├── scripts/                     # Deployment and development scripts
+│   ├── setup-dev.sh            # Development environment setup
+│   ├── dev-start.sh            # Start development services
+│   ├── build-images.sh         # Container image building
+│   ├── deploy-production.sh    # Production deployment
+│   ├── test-scaling.sh         # Scaling validation
+│   └── autoscaler.py           # Auto-scaling service
+├── dev-tools/                   # Development dashboard and tools
+│   ├── server.js               # Development dashboard backend
+│   ├── public/index.html       # Development dashboard frontend
+│   └── watcher.py              # File watching service
+├── haproxy/                     # Load balancer configuration
+├── postgres/                    # Database configuration and initialization
+├── tests/performance/           # Performance and load testing
+├── docs/                        # Comprehensive documentation
+│   ├── DEPLOYMENT_INFRASTRUCTURE.md
+│   ├── SCALING_GUIDE.md
+│   └── DEVELOPMENT_SETUP.md
+├── docker-compose.yml           # Basic Docker orchestration
+├── docker-compose.dev.yml       # Development environment
+├── docker-compose.scale.yml     # Horizontal scaling setup
+├── docker-compose.test.yml      # Testing infrastructure
+├── .vscode/                     # VS Code configuration
 ├── README.md                    # This file
 └── setup_dev.py               # Development environment setup script
 ```
@@ -334,8 +436,13 @@ The frontend uses environment variables prefixed with `REACT_APP_`:
 ### Development and Deployment
 - **Docker**: Containerization platform
 - **Docker Compose**: Multi-container orchestration
+- **HAProxy**: Load balancer for horizontal scaling
+- **Prometheus**: Metrics collection and monitoring
+- **Redis**: Session management and task queuing
+- **PostgreSQL**: Production database with connection pooling
+- **GitHub Actions**: Automated CI/CD pipeline
+- **K6**: Performance and load testing
 - **Git**: Version control system
-- **GitHub Actions**: CI/CD pipeline (if configured)
 
 ## Development Workflow
 

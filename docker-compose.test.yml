@@ -1,0 +1,198 @@
+version: '3.8'
+
+# Docker Compose configuration for automated testing
+services:
+  # Test database
+  test-db:
+    image: postgres:15-alpine
+    container_name: mindcoach-test-db
+    environment:
+      - POSTGRES_DB=mindcoach_test
+      - POSTGRES_USER=test_user
+      - POSTGRES_PASSWORD=test_password
+    ports:
+      - "5433:5432"
+    volumes:
+      - test-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U test_user -d mindcoach_test"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Test Redis
+  test-redis:
+    image: redis:7-alpine
+    container_name: mindcoach-test-redis
+    ports:
+      - "6380:6379"
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # Backend test runner
+  backend-test:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.test
+    container_name: mindcoach-backend-test
+    environment:
+      - FLASK_ENV=testing
+      - SECRET_KEY=test-secret-key-for-ci
+      - DATABASE_URL=postgresql://test_user:test_password@test-db:5432/mindcoach_test
+      - REDIS_URL=redis://test-redis:6379/0
+      - CELERY_BROKER_URL=redis://test-redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://test-redis:6379/0
+      - XAI_API_KEY=test-api-key
+      - GROK_API_URL=http://mock-api:8000
+    volumes:
+      - ./backend:/app
+      - ./test-results:/app/test-results
+    depends_on:
+      test-db:
+        condition: service_healthy
+      test-redis:
+        condition: service_healthy
+      mock-api:
+        condition: service_started
+    command: >
+      sh -c "
+        echo 'Waiting for dependencies...' &&
+        sleep 10 &&
+        echo 'Running backend tests...' &&
+        python -m pytest tests/ -v 
+          --cov=app 
+          --cov-report=html:/app/test-results/coverage-html 
+          --cov-report=xml:/app/test-results/coverage.xml 
+          --junitxml=/app/test-results/junit.xml 
+          --tb=short &&
+        echo 'Backend tests completed'
+      "
+
+  # Frontend test runner
+  frontend-test:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.test
+    container_name: mindcoach-frontend-test
+    environment:
+      - CI=true
+      - REACT_APP_API_BASE_URL=http://backend-test:5000/api
+      - REACT_APP_ENVIRONMENT=test
+    volumes:
+      - ./frontend:/app
+      - ./test-results:/app/test-results
+    command: >
+      sh -c "
+        echo 'Running frontend tests...' &&
+        npm run test:run -- --coverage --watchAll=false --testResultsProcessor=jest-junit &&
+        echo 'Running frontend linting...' &&
+        npm run lint &&
+        echo 'Frontend tests completed'
+      "
+
+  # E2E test runner
+  e2e-test:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.e2e
+    container_name: mindcoach-e2e-test
+    environment:
+      - CYPRESS_baseUrl=http://nginx-test:80
+      - CYPRESS_apiUrl=http://backend-test:5000/api
+    volumes:
+      - ./frontend:/app
+      - ./test-results:/app/test-results
+    depends_on:
+      - nginx-test
+      - backend-test
+    command: >
+      sh -c "
+        echo 'Waiting for application to be ready...' &&
+        sleep 30 &&
+        echo 'Running E2E tests...' &&
+        npx cypress run --reporter junit --reporter-options mochaFile=/app/test-results/e2e-results.xml &&
+        echo 'E2E tests completed'
+      "
+
+  # Test nginx for E2E tests
+  nginx-test:
+    image: nginx:alpine
+    container_name: mindcoach-nginx-test
+    ports:
+      - "8080:80"
+    volumes:
+      - ./nginx/nginx.test.conf:/etc/nginx/nginx.conf:ro
+      - ./frontend/build:/usr/share/nginx/html:ro
+    depends_on:
+      - backend-test
+
+  # Mock API for testing
+  mock-api:
+    image: wiremock/wiremock:latest
+    container_name: mindcoach-mock-api
+    ports:
+      - "8000:8080"
+    volumes:
+      - ./test-mocks:/home/wiremock
+    command: --global-response-templating --verbose
+
+  # Performance test runner
+  performance-test:
+    image: loadimpact/k6:latest
+    container_name: mindcoach-performance-test
+    volumes:
+      - ./tests/performance:/scripts
+      - ./test-results:/results
+    environment:
+      - K6_OUT=json=/results/performance-results.json
+    depends_on:
+      - nginx-test
+    command: run --vus 10 --duration 30s /scripts/load-test.js
+
+  # Security test runner
+  security-test:
+    image: owasp/zap2docker-stable
+    container_name: mindcoach-security-test
+    volumes:
+      - ./test-results:/zap/wrk
+    depends_on:
+      - nginx-test
+    command: >
+      sh -c "
+        echo 'Running security scan...' &&
+        zap-baseline.py -t http://nginx-test:80 -J security-report.json -r security-report.html &&
+        echo 'Security scan completed'
+      "
+
+  # Test results aggregator
+  test-aggregator:
+    build:
+      context: ./scripts
+      dockerfile: Dockerfile.test-aggregator
+    container_name: mindcoach-test-aggregator
+    volumes:
+      - ./test-results:/results
+    depends_on:
+      - backend-test
+      - frontend-test
+      - e2e-test
+      - performance-test
+      - security-test
+    command: >
+      sh -c "
+        echo 'Aggregating test results...' &&
+        python aggregate-results.py &&
+        echo 'Test aggregation completed'
+      "
+
+volumes:
+  test-db-data:
+    driver: local
+
+networks:
+  default:
+    name: mindcoach-test-network

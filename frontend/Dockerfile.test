@@ -1,0 +1,32 @@
+# Test Dockerfile for frontend
+FROM node:18-alpine
+
+# Set working directory
+WORKDIR /app
+
+# Install system dependencies
+RUN apk add --no-cache \
+    git \
+    curl
+
+# Copy package files first for better caching
+COPY package*.json ./
+
+# Install dependencies
+RUN npm ci --include=dev
+
+# Copy application code
+COPY . .
+
+# Create test results directory
+RUN mkdir -p test-results
+
+# Set environment variables
+ENV CI=true
+ENV NODE_ENV=test
+
+# Build the application
+RUN npm run build
+
+# Default command
+CMD ["npm", "run", "test:run"]

@@ -1,0 +1,50 @@
+# Testing dependencies
+pytest==7.4.3
+pytest-cov==4.1.0
+pytest-mock==3.12.0
+pytest-asyncio==0.21.1
+pytest-xdist==3.5.0
+pytest-html==4.1.1
+pytest-json-report==1.5.0
+
+# Test utilities
+factory-boy==3.3.0
+faker==20.1.0
+responses==0.24.1
+httpx==0.25.2
+freezegun==1.2.2
+
+# Code quality
+flake8==6.1.0
+black==23.11.0
+isort==5.12.0
+mypy==1.7.1
+bandit==1.7.5
+
+# Performance testing
+locust==2.17.0
+memory-profiler==0.61.0
+
+# Security testing
+safety==2.3.5
+semgrep==1.45.0
+
+# Coverage reporting
+coverage==7.3.2
+coverage-badge==1.1.0
+
+# Database testing
+pytest-postgresql==5.0.0
+alembic==1.12.1
+
+# API testing
+tavern==2.4.1
+schemathesis==3.19.7
+
+# Mock services
+wiremock==2.6.0
+responses==0.24.1
+
+# Reporting
+junit-xml==1.9
+allure-pytest==2.13.2

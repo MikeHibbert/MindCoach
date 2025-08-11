@@ -1,0 +1,37 @@
+# Development dependencies
+debugpy==1.8.0
+watchdog==3.0.0
+flask-debugtoolbar==0.13.1
+flask-profiler==1.8.1
+
+# Code quality and formatting
+black==23.11.0
+isort==5.12.0
+flake8==6.1.0
+mypy==1.7.1
+
+# Testing (if not already in requirements-test.txt)
+pytest==7.4.3
+pytest-cov==4.1.0
+pytest-mock==3.12.0
+
+# Development utilities
+ipython==8.17.2
+jupyter==1.0.0
+python-dotenv==1.0.0
+
+# Database development tools
+alembic==1.12.1
+sqlalchemy-utils==0.41.1
+
+# API development
+httpie==3.2.2
+requests-toolbelt==1.0.0
+
+# Performance profiling
+py-spy==0.3.14
+memory-profiler==0.61.0
+
+# Documentation
+sphinx==7.2.6
+sphinx-rtd-theme==1.3.0
