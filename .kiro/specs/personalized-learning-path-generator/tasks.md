@@ -584,16 +584,25 @@
     - Create RAG document testing and validation tools
     - _Requirements: 8.2, 8.6_
 
-- [ ] 21. Update frontend for LangChain pipeline integration
+- [x] 21. Update frontend for LangChain pipeline integration
 
-  - [ ] 21.1 Create pipeline progress tracking UI
+
+
+
+
+
+  - [x] 21.1 Create pipeline progress tracking UI
+
+
     - Build progress indicator for three-stage content generation
     - Implement real-time status updates for pipeline execution
     - Create stage-specific progress visualization
     - Add error handling and retry options for failed generations
     - _Requirements: 3.8, 9.4_
 
-  - [ ] 21.2 Update lesson interface for new data structures
+  - [x] 21.2 Update lesson interface for new data structures
+
+
     - Modify LessonViewer to work with curriculum scheme data
     - Update lesson navigation to use lesson plan structure
     - Implement curriculum overview and progress tracking

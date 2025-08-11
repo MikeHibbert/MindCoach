@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document summarizes the implementation of Task 19: "Replace existing content generation with LangChain pipeline" for the MindCoach Personalized Learning Path Generator.
+This document summarizes the implementation of LangChain pipeline integration for the MindCoach Personalized Learning Path Generator, including backend pipeline services (Task 19) and frontend integration (Task 21).
 
 ## Implementation Details
 
@@ -77,6 +77,47 @@ This document summarizes the implementation of Task 19: "Replace existing conten
 **Files Modified:**
 - `backend/app/api/lessons.py` - Added new LangChain endpoints
 - `backend/tests/test_lessons_langchain_api.py` - New comprehensive test suite
+
+### Task 21: Update frontend for LangChain pipeline integration ✅
+
+**What was implemented:**
+- Created comprehensive frontend integration for LangChain pipeline with real-time progress tracking
+- Built pipeline progress tracking UI with three-stage visualization and error handling
+- Enhanced lesson interface to work with new curriculum scheme and lesson plan data structures
+- Added curriculum overview and lesson plan preview functionality
+- Implemented seamless content generation workflow with user-friendly interface
+
+**Key Features:**
+- **Pipeline Progress Tracker**: Real-time visualization of three-stage content generation (Curriculum → Lesson Planning → Content Generation)
+- **Curriculum Overview**: Interactive display of course structure, learning objectives, and lesson navigation
+- **Lesson Plan Preview**: Detailed preview of lesson structure, objectives, and activities
+- **Enhanced Lesson Interface**: Updated LessonViewer with new data structures and AI-generated content indicators
+- **Error Handling**: User-friendly error messages with retry functionality and subscription/prerequisite guidance
+- **Accessibility**: Full ARIA compliance, screen reader support, and keyboard navigation
+- **Responsive Design**: Optimized for desktop, tablet, and mobile devices
+
+**Files Created:**
+- `frontend/src/services/pipelineService.js` - LangChain pipeline API service
+- `frontend/src/components/PipelineProgressTracker.js` - Progress tracking UI component
+- `frontend/src/services/__tests__/pipelineService.test.js` - Pipeline service tests
+- `frontend/src/components/__tests__/PipelineProgressTracker.test.js` - Progress tracker tests
+
+**Files Modified:**
+- `frontend/src/components/LessonViewer.js` - Enhanced with curriculum and lesson plan integration
+
+**Subtask 21.1: Create pipeline progress tracking UI**
+- Built comprehensive progress indicator for three-stage content generation
+- Implemented real-time status updates with automatic polling
+- Created stage-specific progress visualization with completion indicators
+- Added error handling with retry options and user-friendly error messages
+- Full accessibility support with ARIA labels and screen reader announcements
+
+**Subtask 21.2: Update lesson interface for new data structures**
+- Modified LessonViewer to work with curriculum scheme data from LangChain pipeline
+- Updated lesson navigation to use lesson plan structure and learning objectives
+- Implemented curriculum overview with interactive lesson navigation
+- Added lesson plan preview with structured lesson information display
+- Enhanced lesson headers with AI-generated content indicators and learning objectives
 
 ## Architecture Overview
 
@@ -182,6 +223,8 @@ graph TB
 - `backend/tests/test_survey_langchain.py` - Survey generation tests
 - `backend/tests/test_pipeline_orchestrator.py` - Pipeline orchestration tests
 - `backend/tests/test_lessons_langchain_api.py` - API endpoint tests
+- `frontend/src/services/__tests__/pipelineService.test.js` - Frontend pipeline service tests
+- `frontend/src/components/__tests__/PipelineProgressTracker.test.js` - Progress tracker component tests
 
 ## Documentation Updates
 
