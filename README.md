@@ -13,6 +13,7 @@ MindCoach is an intelligent web application that creates customized learning exp
 
 ### Technical Features
 - **RAG-Guided Generation**: Content quality ensured through Retrieval-Augmented Generation documents
+- **RAG Document Management**: Version-controlled document system with web-based admin interface
 - **Background Processing**: Asynchronous content generation with real-time progress tracking
 - **File System Storage**: Organized user data structure with JSON metadata and Markdown lessons
 - **Comprehensive Testing**: Unit, integration, and end-to-end testing with accessibility validation

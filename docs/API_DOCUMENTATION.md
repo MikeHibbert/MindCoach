@@ -1256,6 +1256,424 @@ X-RateLimit-Remaining: 95
 X-RateLimit-Reset: 1642262400
 ```
 
+### RAG Document Management
+
+The RAG (Retrieval-Augmented Generation) document management system provides administrative control over the documents that guide the LangChain content generation pipeline. These endpoints are designed for administrators to manage content guidelines, templates, and versioning.
+
+#### List Available RAG Documents
+Retrieves all available RAG documents in the system.
+
+```http
+GET /api/rag-docs
+```
+
+**Response:**
+```json
+{
+  "status": "success",
+  "available_documents": {
+    "general": [
+      "content_guidelines",
+      "survey_guidelines", 
+      "curriculum_guidelines",
+      "lesson_plan_guidelines"
+    ],
+    "subjects": [
+      "python",
+      "javascript",
+      "react"
+    ]
+  },
+  "statistics": {
+    "total_general_docs": 4,
+    "total_subject_docs": 3,
+    "cached_documents": 2,
+    "available_subjects": ["python", "javascript", "react"],
+    "rag_docs_path": "/app/rag_docs",
+    "path_exists": true
+  }
+}
+```
+
+#### Get RAG Document
+Retrieves the content of a specific RAG document.
+
+```http
+GET /api/rag-docs/{doc_type}
+```
+
+**Path Parameters:**
+- `doc_type` (string): Document type (e.g., "content_guidelines", "survey_guidelines")
+
+**Query Parameters:**
+- `subject` (string, optional): Subject name for subject-specific templates
+
+**Response:**
+```json
+{
+  "status": "success",
+  "document_type": "content_guidelines",
+  "subject": null,
+  "content": "# Content Guidelines for Lesson Generation\n\n## Lesson Structure Template\n\nEvery lesson should follow this structure...",
+  "content_length": 2847
+}
+```
+
+#### Validate RAG Document
+Validates the structure and format of a RAG document.
+
+```http
+POST /api/rag-docs/{doc_type}/validate
+```
+
+**Request Body:**
+```json
+{
+  "content": "# Content Guidelines\n\n## Lesson Structure Template\n\n```python\ncode example\n```",
+  "subject": "python"
+}
+```
+
+**Response:**
+```json
+{
+  "status": "success",
+  "document_type": "content_guidelines",
+  "validation_results": {
+    "has_content": true,
+    "has_headers": true,
+    "has_examples": true,
+    "has_lesson_structure": true,
+    "has_exercise_format": false,
+    "proper_format": true,
+    "is_valid": true
+  },
+  "is_valid": true
+}
+```
+
+#### Get Documents for Pipeline Stage
+Retrieves all RAG documents relevant to a specific pipeline stage.
+
+```http
+GET /api/rag-docs/stage/{stage}
+```
+
+**Path Parameters:**
+- `stage` (string): Pipeline stage ("survey", "curriculum", "lesson_plans", "content")
+
+**Query Parameters:**
+- `subject` (string, optional): Subject name for subject-specific templates
+
+**Response:**
+```json
+{
+  "status": "success",
+  "stage": "content",
+  "subject": "python",
+  "document_count": 2,
+  "documents": [
+    "# Content Guidelines for Lesson Generation...",
+    "# Python Templates\n\n## Python-specific content..."
+  ]
+}
+```
+
+#### Get Document Version History
+Retrieves the version history for a RAG document.
+
+```http
+GET /api/rag-docs/{doc_type}/versions
+```
+
+**Query Parameters:**
+- `subject` (string, optional): Subject name for subject-specific documents
+
+**Response:**
+```json
+{
+  "status": "success",
+  "document_type": "content_guidelines",
+  "subject": null,
+  "current_version": "1.2",
+  "total_versions": 3,
+  "versions": {
+    "1.0": {
+      "created_at": "2024-01-15T10:00:00Z",
+      "description": "Initial version",
+      "author": "system",
+      "content_length": 2500
+    },
+    "1.1": {
+      "created_at": "2024-01-15T11:00:00Z", 
+      "description": "Added exercise guidelines",
+      "author": "admin",
+      "content_length": 2700
+    },
+    "1.2": {
+      "created_at": "2024-01-15T12:00:00Z",
+      "description": "Updated formatting standards",
+      "author": "admin",
+      "content_length": 2847
+    }
+  }
+}
+```
+
+#### Get Specific Document Version
+Retrieves a specific version of a RAG document.
+
+```http
+GET /api/rag-docs/{doc_type}/versions/{version}
+```
+
+**Path Parameters:**
+- `version` (string): Version number (e.g., "1.0", "1.1")
+
+**Query Parameters:**
+- `subject` (string, optional): Subject name for subject-specific documents
+
+**Response:**
+```json
+{
+  "status": "success",
+  "document_type": "content_guidelines",
+  "subject": null,
+  "version": "1.0",
+  "content": "# Content Guidelines for Lesson Generation (Version 1.0)...",
+  "content_length": 2500
+}
+```
+
+#### Create New Document Version
+Creates a new version of a RAG document.
+
+```http
+POST /api/rag-docs/{doc_type}/versions
+```
+
+**Request Body:**
+```json
+{
+  "content": "# Updated Content Guidelines\n\n## New Section\n\nThis is the updated content...",
+  "description": "Added new formatting guidelines",
+  "author": "admin_user",
+  "subject": null
+}
+```
+
+**Response:**
+```json
+{
+  "status": "success",
+  "message": "Created new version 1.3",
+  "document_type": "content_guidelines",
+  "subject": null,
+  "new_version": "1.3",
+  "description": "Added new formatting guidelines",
+  "author": "admin_user"
+}
+```
+
+**Status Code:** `201 Created`
+
+#### Rollback Document Version
+Rolls back a document to a previous version.
+
+```http
+POST /api/rag-docs/{doc_type}/rollback
+```
+
+**Request Body:**
+```json
+{
+  "target_version": "1.1",
+  "subject": null
+}
+```
+
+**Response:**
+```json
+{
+  "status": "success",
+  "message": "Successfully rolled back to version 1.1",
+  "document_type": "content_guidelines",
+  "subject": null,
+  "target_version": "1.1"
+}
+```
+
+#### Compare Document Versions
+Compares two versions of a RAG document.
+
+```http
+POST /api/rag-docs/{doc_type}/versions/compare
+```
+
+**Request Body:**
+```json
+{
+  "version1": "1.1",
+  "version2": "1.2",
+  "subject": null
+}
+```
+
+**Response:**
+```json
+{
+  "status": "success",
+  "comparison": {
+    "document_type": "content_guidelines",
+    "subject": null,
+    "version1": "1.1",
+    "version2": "1.2",
+    "version1_length": 2700,
+    "version2_length": 2847,
+    "version1_lines": 95,
+    "version2_lines": 98,
+    "length_difference": 147,
+    "lines_difference": 3,
+    "identical": false
+  }
+}
+```
+
+#### Delete Document Version
+Deletes a specific version of a RAG document (cannot delete current version).
+
+```http
+DELETE /api/rag-docs/{doc_type}/versions/{version}
+```
+
+**Request Body:**
+```json
+{
+  "subject": null
+}
+```
+
+**Response:**
+```json
+{
+  "status": "success",
+  "message": "Successfully deleted version 1.0",
+  "document_type": "content_guidelines",
+  "subject": null,
+  "deleted_version": "1.0"
+}
+```
+
+#### Clear Document Cache
+Clears the RAG document cache to force reload from disk.
+
+```http
+POST /api/rag-docs/cache/clear
+```
+
+**Response:**
+```json
+{
+  "status": "success",
+  "message": "Document cache cleared successfully"
+}
+```
+
+#### Reload Document
+Reloads a specific RAG document from disk, bypassing cache.
+
+```http
+POST /api/rag-docs/{doc_type}/reload
+```
+
+**Request Body:**
+```json
+{
+  "subject": null
+}
+```
+
+**Response:**
+```json
+{
+  "status": "success",
+  "message": "Document reloaded successfully: content_guidelines",
+  "content_length": 2847
+}
+```
+
+#### Get Document Statistics
+Retrieves detailed statistics about RAG documents and validation status.
+
+```http
+GET /api/rag-docs/stats
+```
+
+**Response:**
+```json
+{
+  "status": "success",
+  "statistics": {
+    "total_general_docs": 4,
+    "total_subject_docs": 3,
+    "cached_documents": 5,
+    "available_subjects": ["python", "javascript", "react"],
+    "rag_docs_path": "/app/rag_docs",
+    "path_exists": true,
+    "versions_path": "/app/rag_docs/versions",
+    "metadata_path": "/app/rag_docs/metadata"
+  },
+  "validation_summary": {
+    "content_guidelines": true,
+    "survey_guidelines": true,
+    "curriculum_guidelines": false,
+    "lesson_plan_guidelines": true
+  },
+  "total_valid_documents": 3,
+  "total_invalid_documents": 1
+}
+```
+
+### RAG Document Error Responses
+
+#### Document Not Found
+```json
+{
+  "status": "error",
+  "message": "Document not found: nonexistent_doc"
+}
+```
+
+#### Version Not Found
+```json
+{
+  "status": "error", 
+  "message": "Version 2.0 not found for document content_guidelines"
+}
+```
+
+#### Validation Failed
+```json
+{
+  "status": "error",
+  "message": "Document content validation failed",
+  "validation_results": {
+    "has_content": true,
+    "has_headers": false,
+    "has_examples": false,
+    "is_valid": false
+  }
+}
+```
+
+#### Cannot Delete Current Version
+```json
+{
+  "status": "error",
+  "message": "Failed to delete version 1.2. It may be the current version or not exist."
+}
+```
+
 ## Webhooks
 
 MindCoach supports webhooks for real-time notifications of important events.
