@@ -1,0 +1,52 @@
+{
+  "validation_summary": {
+    "start_time": "2025-08-12T07:12:46.083868",
+    "duration_seconds": 80.496494,
+    "total_validations": 6,
+    "passed_validations": 5,
+    "failed_validations": 1
+  },
+  "validation_results": {
+    "container_startup": {
+      "status": "failed",
+      "running_containers": 2,
+      "container_details": "mindcoach-test-db\tUp 45 seconds (healthy)\nmindcoach-test-redis\tUp 45 seconds (healthy)\n"
+    },
+    "database_connectivity": {
+      "status": "passed",
+      "connection_test": true,
+      "basic_operations": true
+    },
+    "redis_connectivity": {
+      "status": "passed",
+      "connection_test": true,
+      "basic_operations": true
+    },
+    "data_persistence": {
+      "status": "passed",
+      "database_persistence": true,
+      "redis_persistence": true
+    },
+    "container_networking": {
+      "status": "passed",
+      "database_network": true,
+      "redis_network": true,
+      "api_network": true
+    },
+    "environment_configuration": {
+      "status": "passed",
+      "database_env_vars": true,
+      "redis_env_check": true,
+      "secrets_secure": true
+    }
+  },
+  "environment": {
+    "docker_version": "Docker version 28.3.2, build 578ccf6",
+    "compose_version": "Docker Compose version v2.38.2-desktop.1",
+    "python_version": "3.10.8 (tags/v3.10.8:aaaf517, Oct 11 2022, 16:50:30) [MSC v.1933 64 bit (AMD64)]",
+    "test_data_dir": "C:\\Users\\Mike\\AppData\\Local\\Temp\\docker_validation_c3tai_9b"
+  },
+  "recommendations": [
+    "Check Docker daemon status and container resource limits"
+  ]
+}

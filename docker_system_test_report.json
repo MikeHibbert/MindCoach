@@ -1,0 +1,33 @@
+{
+  "test_summary": {
+    "start_time": "2025-08-12T07:06:52.942368",
+    "duration_seconds": 225.882174,
+    "total_tests": 3,
+    "passed_tests": 1,
+    "failed_tests": 2
+  },
+  "test_results": {
+    "container_startup": {
+      "status": "passed",
+      "running_containers": 3,
+      "container_output": "NAMES                  STATUS\nmindcoach-test-db      Up 30 seconds (healthy)\nmindcoach-test-redis   Up 30 seconds (healthy)\nmindcoach-mock-api     Up 30 seconds (healthy)\n"
+    },
+    "container_networking": {
+      "status": "failed",
+      "database_connection": true,
+      "redis_connection": true,
+      "service_communication": false
+    },
+    "environment_variables": {
+      "status": "failed",
+      "error": "Command '['docker-compose', '-f', 'docker-compose.test.yml', 'run', '--rm', 'backend-test', 'python', '-c', \"\\nimport os\\nimport json\\n\\nenv_vars = {\\n    'FLASK_ENV': os.getenv('FLASK_ENV'),\\n    'SECRET_KEY': os.getenv('SECRET_KEY'),\\n    'DATABASE_URL': os.getenv('DATABASE_URL'),\\n    'REDIS_URL': os.getenv('REDIS_URL'),\\n    'XAI_API_KEY': os.getenv('XAI_API_KEY'),\\n    'GROK_API_URL': os.getenv('GROK_API_URL'),\\n    'LOG_LEVEL': os.getenv('LOG_LEVEL')\\n}\\n\\n# Check required variables are set\\nrequired_vars = ['FLASK_ENV', 'SECRET_KEY', 'DATABASE_URL', 'REDIS_URL']\\nmissing_vars = [var for var in required_vars if not env_vars[var]]\\n\\nresult = {\\n    'env_vars': env_vars,\\n    'missing_vars': missing_vars,\\n    'all_required_set': len(missing_vars) == 0\\n}\\n\\nprint(json.dumps(result))\\n\"]' returned non-zero exit status 1."
+    }
+  },
+  "environment": {
+    "docker_version": "Docker version 28.3.2, build 578ccf6",
+    "compose_version": "Docker Compose version v2.38.2-desktop.1",
+    "python_version": "3.10.8 (tags/v3.10.8:aaaf517, Oct 11 2022, 16:50:30) [MSC v.1933 64 bit (AMD64)]",
+    "test_data_dir": "C:\\Users\\Mike\\AppData\\Local\\Temp\\docker_test_data_7wlxn9z_",
+    "test_users_dir": "C:\\Users\\Mike\\AppData\\Local\\Temp\\docker_test_users_9zfcoq6i"
+  }
+}
