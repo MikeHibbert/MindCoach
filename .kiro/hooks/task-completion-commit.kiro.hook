@@ -1,0 +1,18 @@
+{
+  "enabled": true,
+  "name": "Task Completion Auto-Commit",
+  "description": "Automatically updates documentation and commits code to git when a main task and all its subtasks are successfully completed",
+  "version": "1",
+  "when": {
+    "type": "fileEdited",
+    "patterns": [
+      "task-*-completion-summary.md",
+      "*completion-summary.md",
+      "*task-complete*.md"
+    ]
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "A task completion summary file has been created or updated. Please: 1) Review and update relevant documentation in the docs/ folder to reflect any changes made during this task, 2) Stage all changes using git add, 3) Create a meaningful commit message describing the completed task and changes, 4) Commit the changes using git commit, 5) Push the changes to the remote repository using git push"
+  }
+}

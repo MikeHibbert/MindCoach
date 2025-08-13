@@ -1,12 +1,14 @@
 from flask import Flask, jsonify, request, g
 from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS
+from flask_jwt_extended import JWTManager
 import os
 import logging
 import time
 from logging.handlers import RotatingFileHandler
 
 db = SQLAlchemy()
+jwt = JWTManager()
 
 def create_app(config_name=None):
     app = Flask(__name__)
@@ -19,6 +21,10 @@ def create_app(config_name=None):
     
     # Initialize extensions
     db.init_app(app)
+    jwt.init_app(app)
+    
+    # Configure JWT callbacks
+    configure_jwt_callbacks(jwt)
     
     # Configure CORS with security settings
     CORS(app, 
@@ -36,6 +42,7 @@ def create_app(config_name=None):
     register_performance_monitoring(app)
     
     # Register blueprints
+    from app.api.auth import auth_bp
     from app.api.users import users_bp
     from app.api.subjects import subjects_bp
     from app.api.surveys import surveys_bp
@@ -46,6 +53,7 @@ def create_app(config_name=None):
     from app.api.langchain_test import langchain_test_bp
     from app.api.rag_documents import rag_docs_bp
     
+    app.register_blueprint(auth_bp, url_prefix='/api')
     app.register_blueprint(users_bp, url_prefix='/api')
     app.register_blueprint(subjects_bp, url_prefix='/api')
     app.register_blueprint(surveys_bp, url_prefix='/api')
@@ -201,3 +209,57 @@ def register_error_handlers(app):
                 'details': None
             }
         }), 500
+
+def configure_jwt_callbacks(jwt_manager):
+    """Configure JWT callbacks for token validation and error handling"""
+    
+    @jwt_manager.token_in_blocklist_loader
+    def check_if_token_revoked(jwt_header, jwt_payload):
+        """Check if token is blacklisted"""
+        from app.services.auth_service import AuthService
+        jti = jwt_payload['jti']
+        return AuthService.is_token_blacklisted(jti)
+    
+    @jwt_manager.expired_token_loader
+    def expired_token_callback(jwt_header, jwt_payload):
+        """Handle expired token"""
+        return jsonify({
+            'error': {
+                'code': 'TOKEN_EXPIRED',
+                'message': 'Token has expired',
+                'details': None
+            }
+        }), 401
+    
+    @jwt_manager.invalid_token_loader
+    def invalid_token_callback(error):
+        """Handle invalid token"""
+        return jsonify({
+            'error': {
+                'code': 'INVALID_TOKEN',
+                'message': 'Invalid token',
+                'details': str(error)
+            }
+        }), 401
+    
+    @jwt_manager.unauthorized_loader
+    def missing_token_callback(error):
+        """Handle missing token"""
+        return jsonify({
+            'error': {
+                'code': 'MISSING_TOKEN',
+                'message': 'Authorization token is required',
+                'details': str(error)
+            }
+        }), 401
+    
+    @jwt_manager.revoked_token_loader
+    def revoked_token_callback(jwt_header, jwt_payload):
+        """Handle revoked token"""
+        return jsonify({
+            'error': {
+                'code': 'TOKEN_REVOKED',
+                'message': 'Token has been revoked',
+                'details': None
+            }
+        }), 401

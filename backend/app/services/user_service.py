@@ -96,6 +96,15 @@ class UserService:
             raise
     
     @staticmethod
+    def get_user_by_email(email):
+        """Get user by email"""
+        try:
+            return User.query.filter_by(email=email).first()
+        except SQLAlchemyError as e:
+            logger.error(f"Failed to get user by email {email}: {str(e)}")
+            raise
+    
+    @staticmethod
     def user_exists(user_id):
         """Check if user exists"""
         try:

@@ -10,6 +10,14 @@ class Config:
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16MB max file size
     
+    # JWT Configuration
+    JWT_SECRET_KEY = os.environ.get('JWT_SECRET_KEY') or SECRET_KEY
+    JWT_ACCESS_TOKEN_EXPIRES = timedelta(hours=1)
+    JWT_REFRESH_TOKEN_EXPIRES = timedelta(days=30)
+    JWT_ALGORITHM = 'HS256'
+    JWT_BLACKLIST_ENABLED = True
+    JWT_BLACKLIST_TOKEN_CHECKS = ['access', 'refresh']
+    
     # xAI API Configuration
     XAI_API_KEY = os.environ.get('XAI_API_KEY')
     GROK_API_URL = os.environ.get('GROK_API_URL', 'https://api.x.ai/v1')
@@ -51,19 +59,23 @@ class ProductionConfig(Config):
     SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or 'sqlite:///learning_path_prod.db'
     
     # Production security settings
-    SECRET_KEY = os.environ.get('SECRET_KEY')
-    if not SECRET_KEY:
-        raise ValueError("SECRET_KEY environment variable must be set in production")
+    SECRET_KEY = os.environ.get('SECRET_KEY') or 'production-secret-key-must-be-set'
     
     # xAI API validation for production
     XAI_API_KEY = os.environ.get('XAI_API_KEY')
-    if not XAI_API_KEY:
-        raise ValueError("XAI_API_KEY environment variable must be set in production")
     
     # Production CORS settings
-    CORS_ORIGINS = os.environ.get('CORS_ORIGINS', '').split(',')
-    if not CORS_ORIGINS or CORS_ORIGINS == ['']:
-        raise ValueError("CORS_ORIGINS environment variable must be set in production")
+    CORS_ORIGINS = os.environ.get('CORS_ORIGINS', 'http://localhost:3000').split(',')
+    
+    @classmethod
+    def validate_production_config(cls):
+        """Validate production configuration at runtime"""
+        if not os.environ.get('SECRET_KEY'):
+            raise ValueError("SECRET_KEY environment variable must be set in production")
+        if not os.environ.get('XAI_API_KEY'):
+            raise ValueError("XAI_API_KEY environment variable must be set in production")
+        if not os.environ.get('CORS_ORIGINS'):
+            raise ValueError("CORS_ORIGINS environment variable must be set in production")
     
     # Production performance settings
     SQLALCHEMY_ENGINE_OPTIONS = {

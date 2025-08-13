@@ -251,8 +251,8 @@ def get_survey_results(user_id, subject):
             'error': 'retrieval_error',
             'message': 'Failed to retrieve survey results'
         }), 500
-def
- _validate_survey_structure(survey: dict) -> bool:
+
+def _validate_survey_structure(survey: dict) -> bool:
     """
     Validate that a LangChain-generated survey meets quality standards
     

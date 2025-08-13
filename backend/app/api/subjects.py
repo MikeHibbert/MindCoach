@@ -3,6 +3,7 @@ from app.services.subscription_service import SubscriptionService
 from app.services.user_service import UserService
 from app.services.user_data_service import UserDataService
 from app.utils.validation import validate_user_id, validate_subject
+from app.utils.auth_decorators import auth_required, user_owns_resource, optional_auth
 import logging
 
 logger = logging.getLogger(__name__)
@@ -44,11 +45,10 @@ AVAILABLE_SUBJECTS = {
 }
 
 @subjects_bp.route('/subjects', methods=['GET'])
-def list_subjects():
+@optional_auth
+def list_subjects(current_user=None):
     """List all available subjects with pricing information"""
     try:
-        user_id = request.args.get('user_id')
-        
         subjects_list = []
         for subject_key, subject_info in AVAILABLE_SUBJECTS.items():
             subject_data = {
@@ -63,14 +63,14 @@ def list_subjects():
                 'locked': True  # Default to locked
             }
             
-            # Check subscription status if user_id provided
-            if user_id and validate_user_id(user_id):
+            # Check subscription status if user is authenticated
+            if current_user:
                 try:
-                    has_active = SubscriptionService.has_active_subscription(user_id, subject_key)
+                    has_active = SubscriptionService.has_active_subscription(current_user.user_id, subject_key)
                     subject_data['locked'] = not has_active
                     subject_data['available'] = True
                 except Exception as e:
-                    logger.warning(f"Could not check subscription for {user_id}, {subject_key}: {str(e)}")
+                    logger.warning(f"Could not check subscription for {current_user.user_id}, {subject_key}: {str(e)}")
             
             subjects_list.append(subject_data)
         
@@ -89,6 +89,7 @@ def list_subjects():
         }), 500
 
 @subjects_bp.route('/users/<user_id>/subjects/<subject>/select', methods=['POST'])
+@user_owns_resource()
 def select_subject(user_id, subject):
     """Select a subject for learning (requires active subscription)"""
     try:

@@ -1,0 +1,108 @@
+version: '3.8'
+
+services:
+  # PostgreSQL for development
+  postgres-dev:
+    image: postgres:15-alpine
+    container_name: mindcoach-postgres-simple
+    environment:
+      - POSTGRES_DB=mindcoach_dev
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=devpassword
+      - POSTGRES_HOST_AUTH_METHOD=trust
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres-simple-data:/var/lib/postgresql/data
+    restart: unless-stopped
+    networks:
+      - mindcoach-simple-network
+
+  # Redis for development
+  redis-dev:
+    image: redis:7-alpine
+    container_name: mindcoach-redis-simple
+    ports:
+      - "6380:6379"
+    volumes:
+      - redis-simple-data:/data
+    command: >
+      redis-server 
+      --appendonly yes 
+      --maxmemory 128mb 
+      --maxmemory-policy allkeys-lru
+    restart: unless-stopped
+    networks:
+      - mindcoach-simple-network
+
+  # Flask backend API (simplified)
+  backend-dev:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    container_name: mindcoach-backend-simple
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./backend:/app
+      - ./data:/app/data
+      - ./users:/app/users
+      - ./logs/backend:/app/logs
+    environment:
+      - FLASK_ENV=development
+      - FLASK_DEBUG=1
+      - SECRET_KEY=dev-secret-key-change-in-production
+      - DATABASE_URL=sqlite:///data/mindcoach_dev.db
+      - REDIS_URL=redis://redis-dev:6379/0
+      - CORS_ORIGINS=http://localhost:3000,http://localhost:8080
+      - LOG_LEVEL=DEBUG
+      - PYTHONPATH=/app
+      - PYTHONUNBUFFERED=1
+      - XAI_API_KEY=dev-api-key-placeholder
+      - GROK_API_URL=http://localhost:8000
+    restart: unless-stopped
+    networks:
+      - mindcoach-simple-network
+    depends_on:
+      - redis-dev
+    command: >
+      sh -c "
+        echo 'Starting simple Flask development server...' &&
+        python run_simple.py
+      "
+
+  # React frontend with hot reloading
+  frontend-dev:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    container_name: mindcoach-frontend-simple
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - ./logs/frontend:/app/logs
+    environment:
+      - REACT_APP_API_BASE_URL=http://localhost:5000/api
+      - REACT_APP_ENVIRONMENT=development
+      - CHOKIDAR_USEPOLLING=true
+      - WATCHPACK_POLLING=true
+      - FAST_REFRESH=true
+    stdin_open: true
+    tty: true
+    restart: unless-stopped
+    networks:
+      - mindcoach-simple-network
+    depends_on:
+      - backend-dev
+
+volumes:
+  postgres-simple-data:
+    driver: local
+  redis-simple-data:
+    driver: local
+
+networks:
+  mindcoach-simple-network:
+    driver: bridge
