@@ -87,6 +87,42 @@ const UserMenu = () => {
             <span>Settings</span>
           </button>
           
+          <button
+            onClick={async () => {
+              setIsOpen(false);
+              // Quick token top-up for testing
+              try {
+                const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000/api';
+                const response = await fetch(`${API_BASE_URL}/users/${encodeURIComponent(user.user_id)}/tokens/topup`, {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify({ amount: 200 }),
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                  alert(`✅ Success! Added 200 tokens.\nNew balance: ${data.new_balance} tokens`);
+                  // Refresh the page to update token display
+                  window.location.reload();
+                } else {
+                  alert(`❌ Error: ${data.error?.message || 'Failed to add tokens'}`);
+                }
+              } catch (err) {
+                console.error('Error topping up tokens:', err);
+                alert('❌ Error: Could not connect to server');
+              }
+            }}
+            className="w-full text-left px-4 py-2 text-sm text-green-600 hover:bg-green-50 flex items-center space-x-2"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
+            </svg>
+            <span>Top Up Tokens (+200)</span>
+          </button>
+          
           <div className="border-t border-gray-100 mt-1">
             <button
               onClick={handleLogout}

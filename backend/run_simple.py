@@ -4,12 +4,15 @@ Simple Flask application runner for development
 Bypasses complex database initialization for quick startup
 """
 
-from flask import Flask, jsonify
+from flask import Flask, jsonify, request
 from flask_cors import CORS
 import os
 
 app = Flask(__name__)
 CORS(app)
+
+# Simple in-memory token storage for development
+USER_TOKENS = {}
 
 # Simple subjects data for development
 SUBJECTS_DATA = [
@@ -124,11 +127,50 @@ def create_user():
 @app.route('/api/users/<user_id>/tokens')
 def get_user_tokens(user_id):
     """Get user's token balance"""
-    # In a real app, this would come from a database
-    # For demo purposes, give users 150 tokens
+    # Get tokens from in-memory storage, default to 150 for new users
+    tokens = USER_TOKENS.get(user_id, 150)
     return jsonify({
         'user_id': user_id,
-        'tokens': 150,
+        'tokens': tokens,
+        'last_updated': '2024-01-01T00:00:00Z'
+    })
+
+@app.route('/api/users/<user_id>/tokens/topup', methods=['POST'])
+def topup_user_tokens(user_id):
+    """Top up user's token balance"""
+    data = request.get_json()
+    
+    if not data or 'amount' not in data:
+        return jsonify({
+            'error': {
+                'code': 'INVALID_REQUEST',
+                'message': 'Amount is required'
+            }
+        }), 400
+    
+    amount = data['amount']
+    
+    if not isinstance(amount, int) or amount <= 0:
+        return jsonify({
+            'error': {
+                'code': 'INVALID_AMOUNT',
+                'message': 'Amount must be a positive integer'
+            }
+        }), 400
+    
+    # Get current balance
+    current_tokens = USER_TOKENS.get(user_id, 150)
+    
+    # Add tokens
+    new_balance = current_tokens + amount
+    USER_TOKENS[user_id] = new_balance
+    
+    return jsonify({
+        'message': f'Successfully added {amount} tokens',
+        'user_id': user_id,
+        'previous_balance': current_tokens,
+        'tokens_added': amount,
+        'new_balance': new_balance,
         'last_updated': '2024-01-01T00:00:00Z'
     })
 
@@ -152,7 +194,7 @@ def create_custom_subject_for_user(user_id):
     
     # Check if user has enough tokens (simplified check)
     tokens_required = data.get('tokensRequired', 50)
-    user_tokens = 100  # In real app, get from database
+    user_tokens = USER_TOKENS.get(user_id, 150)  # Get from in-memory storage
     
     if user_tokens < tokens_required:
         return jsonify({
@@ -179,11 +221,13 @@ def create_custom_subject_for_user(user_id):
         'created_at': time.time()
     }
     
+    # Deduct tokens from user's balance
+    USER_TOKENS[user_id] = user_tokens - tokens_required
+    
     # In a real app, you would:
-    # 1. Deduct tokens from user's balance
-    # 2. Save the custom subject to database
-    # 3. Trigger AI content generation pipeline
-    # 4. Create the subject directory structure
+    # 1. Save the custom subject to database
+    # 2. Trigger AI content generation pipeline
+    # 3. Create the subject directory structure
     
     return jsonify({
         'message': f'Custom subject "{data["name"]}" created successfully',

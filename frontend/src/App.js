@@ -1,5 +1,6 @@
 import React, { Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { AuthProvider } from './contexts/AuthContext';
 import ResponsiveLayout from './components/ResponsiveLayout';
 import LoadingSpinner from './components/LoadingSpinner';
 
@@ -12,20 +13,22 @@ const RAGDocumentManager = React.lazy(() => import('./components/RAGDocumentMana
 
 function App() {
   return (
-    <Router>
-      <ResponsiveLayout>
-        <Suspense fallback={<LoadingSpinner />}>
-          <Routes>
-            <Route path="/" element={<SubjectSelector />} />
-            <Route path="/subjects/:subject/survey" element={<Survey />} />
-            <Route path="/subjects/:subject/lessons" element={<LessonViewer />} />
-            <Route path="/subjects/:subject/lessons/:lessonId" element={<LessonViewer />} />
-            <Route path="/payment/:subject" element={<PaymentGate />} />
-            <Route path="/admin/rag-documents" element={<RAGDocumentManager />} />
-          </Routes>
-        </Suspense>
-      </ResponsiveLayout>
-    </Router>
+    <AuthProvider>
+      <Router>
+        <ResponsiveLayout>
+          <Suspense fallback={<LoadingSpinner />}>
+            <Routes>
+              <Route path="/" element={<SubjectSelector />} />
+              <Route path="/subjects/:subject/survey" element={<Survey />} />
+              <Route path="/subjects/:subject/lessons" element={<LessonViewer />} />
+              <Route path="/subjects/:subject/lessons/:lessonId" element={<LessonViewer />} />
+              <Route path="/payment/:subject" element={<PaymentGate />} />
+              <Route path="/admin/rag-documents" element={<RAGDocumentManager />} />
+            </Routes>
+          </Suspense>
+        </ResponsiveLayout>
+      </Router>
+    </AuthProvider>
   );
 }
 
