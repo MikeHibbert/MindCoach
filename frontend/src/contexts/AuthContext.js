@@ -21,7 +21,37 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     const initializeAuth = async () => {
       try {
-        const token = localStorage.getItem('access_token');
+        let token = localStorage.getItem('access_token');
+        
+        // For development: auto-login if no token exists
+        if (!token) {
+          console.log('No token found, auto-logging in for development...');
+          try {
+            const loginResponse = await fetch(`${API_BASE_URL}/auth/login`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                email: 'test@example.com',
+                password: 'test'
+              }),
+            });
+
+            if (loginResponse.ok) {
+              const loginData = await loginResponse.json();
+              localStorage.setItem('access_token', loginData.access_token);
+              localStorage.setItem('refresh_token', loginData.refresh_token);
+              setUser(loginData.user);
+              console.log('Auto-login successful:', loginData.user);
+              setLoading(false);
+              return;
+            }
+          } catch (autoLoginErr) {
+            console.log('Auto-login failed, continuing without auth:', autoLoginErr);
+          }
+        }
+        
         if (token) {
           // Validate token and get user info
           const response = await fetch(`${API_BASE_URL}/auth/me`, {

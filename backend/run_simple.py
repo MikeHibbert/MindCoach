@@ -14,6 +14,13 @@ CORS(app)
 # Simple in-memory token storage for development
 USER_TOKENS = {}
 
+# Mock user for development
+MOCK_USER = {
+    'user_id': 'test_user',
+    'email': 'test@example.com',
+    'id': 1
+}
+
 # Simple subjects data for development
 SUBJECTS_DATA = [
     {
@@ -65,6 +72,53 @@ def health_check():
         'status': 'healthy',
         'message': 'MindCoach API is running',
         'version': '1.0.0'
+    })
+
+# Mock authentication endpoints for development
+@app.route('/api/auth/me')
+def get_current_user():
+    """Get current user info (mock for development)"""
+    # In development, always return the mock user
+    return jsonify({
+        'user': MOCK_USER
+    })
+
+@app.route('/api/auth/login', methods=['POST'])
+def login():
+    """Mock login endpoint"""
+    data = request.get_json()
+    
+    # Accept any email/password for development
+    return jsonify({
+        'access_token': 'mock-access-token',
+        'refresh_token': 'mock-refresh-token',
+        'user': MOCK_USER
+    })
+
+@app.route('/api/auth/register', methods=['POST'])
+def register():
+    """Mock register endpoint"""
+    data = request.get_json()
+    
+    # Accept any registration for development
+    return jsonify({
+        'access_token': 'mock-access-token',
+        'refresh_token': 'mock-refresh-token',
+        'user': MOCK_USER
+    })
+
+@app.route('/api/auth/logout', methods=['POST'])
+def logout():
+    """Mock logout endpoint"""
+    return jsonify({
+        'message': 'Logged out successfully'
+    })
+
+@app.route('/api/auth/refresh', methods=['POST'])
+def refresh_token():
+    """Mock token refresh endpoint"""
+    return jsonify({
+        'access_token': 'mock-access-token'
     })
 
 @app.route('/api/subjects')
@@ -128,6 +182,10 @@ def create_user():
 def get_user_tokens(user_id):
     """Get user's token balance"""
     # Get tokens from in-memory storage, default to 150 for new users
+    # Make sure we have the tokens we added earlier
+    if user_id == 'test_user' and user_id not in USER_TOKENS:
+        USER_TOKENS[user_id] = 350  # Set to the balance we topped up to
+    
     tokens = USER_TOKENS.get(user_id, 150)
     return jsonify({
         'user_id': user_id,
