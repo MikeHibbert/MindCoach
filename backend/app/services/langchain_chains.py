@@ -34,6 +34,7 @@ class BaseLangChainService(ABC):
     def create_chain(self, output_parser=None) -> LLMChain:
         """Create a LangChain chain with the prompt template"""
         prompt = self.get_prompt_template()
+        # logger.info(f"PROMPT: {prompt}")
         chain = LLMChain(
             llm=self.llm,
             prompt=prompt,
@@ -277,32 +278,43 @@ class CurriculumGeneratorChain(ContentGenerationChain):
             template="""
 Create a 5-lesson curriculum for {subject} at {skill_level} level.
 
-ASSESSMENT: {survey_results}
-KNOWN TOPICS: {known_topics}
-GUIDELINES: {rag_guidelines}
-
-Return JSON:
+Return JSON with exactly this structure:
 {{
     "curriculum": {{
         "subject": "{subject}",
         "skill_level": "{skill_level}",
         "total_lessons": 5,
-        "learning_objectives": ["goal1", "goal2", "goal3"],
         "topics": [
             {{
                 "lesson_id": 1,
-                "title": "Lesson Title",
-                "topics": ["topic1", "topic2"],
-                "difficulty": "beginner|intermediate|advanced",
-                "estimated_duration": "60 minutes"
+                "title": "Introduction to {subject}",
+                "difficulty": "beginner"
+            }},
+            {{
+                "lesson_id": 2,
+                "title": "Basic {subject} Concepts",
+                "difficulty": "beginner"
+            }},
+            {{
+                "lesson_id": 3,
+                "title": "Intermediate {subject}",
+                "difficulty": "intermediate"
+            }},
+            {{
+                "lesson_id": 4,
+                "title": "Advanced {subject} Techniques",
+                "difficulty": "intermediate"
+            }},
+            {{
+                "lesson_id": 5,
+                "title": "{subject} Best Practices",
+                "difficulty": "advanced"
             }}
         ]
     }},
     "generated_at": "2024-01-15T10:00:00Z",
     "generation_stage": "curriculum_complete"
 }}
-
-Create 5 progressive lessons covering essential {subject} topics.
 """
         )
     
@@ -341,7 +353,7 @@ Create 5 progressive lessons covering essential {subject} topics.
         
         # Validate curriculum structure
         curriculum = result.get("curriculum", {})
-        curriculum_keys = ["subject", "skill_level", "total_lessons", "learning_objectives", "topics"]
+        curriculum_keys = ["subject", "skill_level", "total_lessons", "topics"]
         if not self.validate_output(curriculum, curriculum_keys):
             raise ValueError("Generated curriculum structure is invalid")
         
@@ -404,34 +416,21 @@ class LessonPlannerChain(ContentGenerationChain):
         return PromptTemplate(
             input_variables=["curriculum_data", "subject", "skill_level", "rag_guidelines"],
             template="""
-Create lesson plans for {subject} curriculum at {skill_level} level.
+Create lesson plans for {subject}.
 
 CURRICULUM: {curriculum_data}
-GUIDELINES: {rag_guidelines}
 
 Return JSON:
 {{
     "lesson_plans": [
         {{
             "lesson_id": 1,
-            "title": "Lesson Title",
-            "learning_objectives": ["objective1", "objective2"],
-            "structure": {{
-                "introduction": "5 minutes",
-                "main_content": "25 minutes",
-                "exercises": "15 minutes",
-                "summary": "5 minutes"
-            }},
-            "activities": ["activity1", "activity2"],
-            "assessment": "Assessment method",
-            "key_concepts": ["concept1", "concept2"]
+            "title": "Lesson Title"
         }}
     ],
     "generated_at": "2024-01-15T10:00:00Z",
     "generation_stage": "lesson_plans_complete"
 }}
-
-Create structured lesson plans for effective {subject} teaching.
 """
         )
     
@@ -476,7 +475,7 @@ Create structured lesson plans for effective {subject} teaching.
         
         # Validate each lesson plan
         for i, lesson_plan in enumerate(lesson_plans):
-            lesson_keys = ["lesson_id", "title", "learning_objectives", "structure", "activities", "assessment"]
+            lesson_keys = ["lesson_id", "title"]
             if not self.validate_output(lesson_plan, lesson_keys):
                 raise ValueError(f"Lesson plan {i+1} has invalid structure")
         

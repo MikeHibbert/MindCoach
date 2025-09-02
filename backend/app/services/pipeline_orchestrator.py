@@ -12,6 +12,7 @@ from dataclasses import dataclass, asdict
 from .langchain_pipeline import LangChainPipelineService
 from .user_data_service import UserDataService
 from .file_service import FileService
+from .lesson_file_service import LessonFileService
 
 logger = logging.getLogger(__name__)
 
@@ -231,6 +232,9 @@ class PipelineOrchestrator:
                 # Save lesson content
                 UserDataService.save_lesson_content(user_id, subject, lesson_id, lesson_content)
             
+            # Create lesson metadata file for proper lesson listing
+            self._create_lesson_metadata(user_id, subject, lesson_plans_data, curriculum_data)
+            
             # Pipeline completed successfully
             self._update_progress(
                 pipeline_id,
@@ -409,6 +413,48 @@ class PipelineOrchestrator:
             'completed_count': status_counts.get('completed', 0),
             'failed_count': status_counts.get('failed', 0)
         }
+    
+    def _create_lesson_metadata(self, user_id: str, subject: str, lesson_plans_data: Dict[str, Any], curriculum_data: Dict[str, Any]) -> None:
+        """Create lesson metadata file for proper lesson listing"""
+        try:
+            lesson_plans = lesson_plans_data.get('lesson_plans', [])
+            curriculum = curriculum_data.get('curriculum', {})
+            
+            # Create metadata structure expected by LessonFileService
+            metadata = {
+                'user_id': user_id,
+                'subject': subject,
+                'skill_level': curriculum.get('skill_level', 'intermediate'),
+                'generated_at': datetime.utcnow().isoformat() + 'Z',
+                'generation_method': 'langchain_pipeline',
+                'total_lessons': len(lesson_plans),
+                'lessons': []
+            }
+            
+            # Add lesson information from lesson plans
+            for lesson_plan in lesson_plans:
+                lesson_info = {
+                    'lesson_number': lesson_plan.get('lesson_id', 1),
+                    'title': lesson_plan.get('title', 'Untitled Lesson'),
+                    'estimated_time': '60 minutes',  # Default from lesson plans
+                    'topics': [],  # Simplified structure doesn't include topics
+                    'difficulty': 'intermediate'  # Default difficulty
+                }
+                metadata['lessons'].append(lesson_info)
+            
+            # Sort lessons by lesson number
+            metadata['lessons'].sort(key=lambda x: x['lesson_number'])
+            
+            # Save metadata using FileService
+            subject_dir = FileService.get_subject_directory(user_id, subject)
+            metadata_path = subject_dir / LessonFileService.METADATA_FILE
+            FileService.save_json(metadata_path, metadata)
+            
+            logger.info(f"Created lesson metadata file for {user_id}/{subject} with {len(lesson_plans)} lessons")
+            
+        except Exception as e:
+            logger.error(f"Failed to create lesson metadata for {user_id}/{subject}: {e}")
+            # Don't raise the exception as this is not critical for pipeline completion
 
 # Global orchestrator instance (lazy-loaded)
 _pipeline_orchestrator = None
