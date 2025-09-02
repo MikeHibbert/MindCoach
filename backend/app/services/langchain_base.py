@@ -176,18 +176,26 @@ class JSONOutputParser(BaseOutputParser[Dict[str, Any]]):
             
         except json.JSONDecodeError as e:
             logger.error(f"Failed to parse JSON from LLM output: {e}")
+            logger.error(f"JSON error at line {e.lineno}, column {e.colno}: {e.msg}")
             logger.error(f"Raw output length: {len(text)}")
-            logger.error(f"Raw output (first 500 chars): {text[:500]}")
-            logger.error(f"Raw output (last 500 chars): {text[-500:]}")
+            logger.error(f"Raw output (first 1000 chars): {text[:1000]}")
+            logger.error(f"Raw output (last 1000 chars): {text[-1000:]}")
+            
+            # Log the specific problematic area
+            if hasattr(e, 'pos') and e.pos:
+                start = max(0, e.pos - 100)
+                end = min(len(text), e.pos + 100)
+                logger.error(f"Problematic area around position {e.pos}: {text[start:end]}")
             
             # Try to fix common JSON issues
             fixed_text = self._attempt_json_fix(text)
             if fixed_text != text:
                 try:
                     logger.info("Attempting to parse fixed JSON")
+                    logger.info(f"Fixed JSON (first 500 chars): {fixed_text[:500]}")
                     return json.loads(fixed_text)
-                except json.JSONDecodeError:
-                    logger.error("Fixed JSON also failed to parse")
+                except json.JSONDecodeError as fix_error:
+                    logger.error(f"Fixed JSON also failed to parse: {fix_error}")
             
             raise ValueError(f"Invalid JSON output from LLM: {e}")
     

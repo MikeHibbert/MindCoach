@@ -114,6 +114,8 @@ class SurveyGenerationChain(ContentGenerationChain):
             template="""
 You are an expert educational assessment designer. Create a comprehensive knowledge assessment survey for {subject}.
 
+SUBJECT CONTEXT: {subject} - Focus on creating questions appropriate for this specific field of study.
+
 ASSESSMENT GUIDELINES:
 {rag_guidelines}
 
@@ -125,31 +127,42 @@ REQUIREMENTS:
 5. Ensure only one option is clearly correct
 6. Base incorrect options on common misconceptions
 7. Use clear, unambiguous language
-8. Include code snippets where appropriate for practical assessment
+8. Include practical scenarios relevant to {subject} when appropriate
 
-DIFFICULTY DEFINITIONS:
-- **Beginner**: Basic terminology, syntax, simple recognition
-- **Intermediate**: Concept application, code understanding, problem-solving
-- **Advanced**: Best practices, optimization, complex scenarios
+DIFFICULTY DEFINITIONS FOR {subject}:
+- **Beginner**: Basic terminology, foundational concepts, simple recognition
+- **Intermediate**: Concept application, understanding relationships, problem-solving
+- **Advanced**: Best practices, complex scenarios, advanced techniques
 
-Return your response as a JSON object with this exact structure:
+IMPORTANT: Ensure all questions are directly relevant to {subject} and avoid any programming or technical coding references unless {subject} is specifically about programming.
+
+Return ONLY valid JSON in this exact format:
+
 {{
     "questions": [
         {{
             "id": 1,
-            "question": "Clear, specific question text (include code if testing practical knowledge)",
+            "question": "Question text here",
             "type": "multiple_choice",
             "options": ["Option A", "Option B", "Option C", "Option D"],
             "correct_answer": "Option A",
-            "difficulty": "beginner|intermediate|advanced",
-            "topic": "specific_topic_name"
+            "difficulty": "beginner",
+            "topic": "topic_name"
         }}
     ],
     "total_questions": 7,
     "subject": "{subject}"
 }}
 
-Create questions that effectively assess {subject} knowledge across all skill levels.
+CRITICAL JSON FORMATTING RULES:
+1. Return ONLY valid JSON - no additional text before or after
+2. Use double quotes for all strings
+3. No trailing commas
+4. Ensure all brackets and braces are properly closed
+5. Create exactly 7 questions for {subject}
+6. Do not include any explanatory text outside the JSON
+
+Create questions that effectively assess {subject} knowledge across all skill levels, ensuring all content is appropriate for the {subject} domain.
 """
         )
     
@@ -272,55 +285,107 @@ Create questions that effectively assess {subject} knowledge across all skill le
 class CurriculumGeneratorChain(ContentGenerationChain):
     """Chain for generating curriculum schemes (Stage 1)"""
     
+    def __init__(self, temperature: float = 0.7, max_tokens: int = 4000):
+        # Use higher token limit for curriculum generation
+        super().__init__(temperature, max_tokens)
+    
     def get_prompt_template(self) -> PromptTemplate:
         return PromptTemplate(
-            input_variables=["survey_results", "subject", "skill_level", "rag_guidelines", "known_topics"],
+            input_variables=["survey_results", "subject", "subject_description", "skill_level", "rag_guidelines", "known_topics"],
             template="""
-Create a 5-lesson curriculum for {subject} at {skill_level} level.
+You are an expert curriculum designer specializing in {subject}. Your role is to create educational content specifically for the subject of {subject}, which is described as: {subject_description}
 
-Return JSON with exactly this structure:
+IMPORTANT: You are creating curriculum for {subject} - {subject_description}. All content must be directly relevant to this subject area and its description. Do NOT create programming or coding content unless the subject is specifically about programming.
+
+TASK: Create a 5-lesson curriculum for {subject} at {skill_level} level.
+
+SUBJECT DETAILS:
+- Subject: {subject}
+- Description: {subject_description}
+- Target Level: {skill_level}
+
+SURVEY ANALYSIS:
+{survey_results}
+
+CURRICULUM REQUIREMENTS:
+1. Create exactly 5 lessons that build upon each other
+2. Each lesson should be appropriate for the {skill_level} level
+3. All content must relate directly to: {subject_description}
+4. Ensure lessons are practical and applicable to the subject area
+5. Progress from foundational concepts to more advanced applications
+
+Return ONLY valid JSON in this exact format:
+
 {{
     "curriculum": {{
         "subject": "{subject}",
         "skill_level": "{skill_level}",
         "total_lessons": 5,
+        "learning_objectives": [
+            "First learning objective for {subject}",
+            "Second learning objective for {subject}",
+            "Third learning objective for {subject}"
+        ],
         "topics": [
             {{
                 "lesson_id": 1,
-                "title": "Introduction to {subject}",
-                "difficulty": "beginner"
+                "title": "Lesson 1 title",
+                "difficulty": "beginner",
+                "topics": ["topic 1", "topic 2"],
+                "estimated_duration": "60 minutes"
             }},
             {{
                 "lesson_id": 2,
-                "title": "Basic {subject} Concepts",
-                "difficulty": "beginner"
+                "title": "Lesson 2 title",
+                "difficulty": "beginner",
+                "topics": ["topic 1", "topic 2"],
+                "estimated_duration": "60 minutes"
             }},
             {{
                 "lesson_id": 3,
-                "title": "Intermediate {subject}",
-                "difficulty": "intermediate"
+                "title": "Lesson 3 title",
+                "difficulty": "intermediate",
+                "topics": ["topic 1", "topic 2"],
+                "estimated_duration": "75 minutes"
             }},
             {{
                 "lesson_id": 4,
-                "title": "Advanced {subject} Techniques",
-                "difficulty": "intermediate"
+                "title": "Lesson 4 title",
+                "difficulty": "intermediate",
+                "topics": ["topic 1", "topic 2"],
+                "estimated_duration": "75 minutes"
             }},
             {{
                 "lesson_id": 5,
-                "title": "{subject} Best Practices",
-                "difficulty": "advanced"
+                "title": "Lesson 5 title",
+                "difficulty": "advanced",
+                "topics": ["topic 1", "topic 2"],
+                "estimated_duration": "90 minutes"
             }}
         ]
     }},
     "generated_at": "2024-01-15T10:00:00Z",
     "generation_stage": "curriculum_complete"
 }}
+
+CRITICAL JSON FORMATTING RULES:
+1. Return ONLY valid JSON - no additional text before or after
+2. Use double quotes for all strings
+3. No trailing commas
+4. Ensure all brackets and braces are properly closed
+5. Replace the example content with actual curriculum for {subject}
+6. Do not include any explanatory text outside the JSON
+
+Remember: You are creating curriculum for {subject} which is {subject_description}. Ensure all lesson titles, topics, and objectives are directly relevant to this subject area.
 """
         )
     
     def generate_curriculum(self, survey_data: Dict[str, Any], subject: str, rag_docs: List[str] = None) -> Dict[str, Any]:
         """Generate curriculum scheme based on survey results"""
         logger.info(f"Starting curriculum generation for {subject}")
+        
+        # Get subject description
+        subject_description = self._get_subject_description(subject)
         
         # Extract skill level from survey data
         skill_level = survey_data.get('skill_level', 'intermediate')
@@ -339,6 +404,7 @@ Return JSON with exactly this structure:
         inputs = {
             "survey_results": survey_summary,
             "subject": subject,
+            "subject_description": subject_description,
             "skill_level": skill_level,
             "rag_guidelines": rag_guidelines,
             "known_topics": ", ".join(known_topics) if known_topics else "None identified"
@@ -408,35 +474,102 @@ Return JSON with exactly this structure:
                 summary += f"- {topic}: {perf['correct']}/{perf['total']} ({percentage:.1f}%)\n"
         
         return summary
+    
+    def _get_subject_description(self, subject: str) -> str:
+        """Get subject description from AVAILABLE_SUBJECTS configuration"""
+        try:
+            # Import AVAILABLE_SUBJECTS from the subjects API
+            from app.api.subjects import AVAILABLE_SUBJECTS
+            
+            if subject in AVAILABLE_SUBJECTS:
+                description = AVAILABLE_SUBJECTS[subject].get('description', '')
+                if description:
+                    logger.debug(f"Found subject description for {subject}: {description}")
+                    return description
+            
+            # Fallback description if not found
+            logger.warning(f"No description found for subject {subject}, using generic description")
+            return f"Educational content related to {subject}"
+            
+        except ImportError as e:
+            logger.error(f"Could not import AVAILABLE_SUBJECTS: {e}")
+            return f"Educational content related to {subject}"
+        except Exception as e:
+            logger.error(f"Error getting subject description for {subject}: {e}")
+            return f"Educational content related to {subject}"
 
 class LessonPlannerChain(ContentGenerationChain):
     """Chain for generating lesson plans (Stage 2)"""
     
+    def __init__(self, temperature: float = 0.7, max_tokens: int = 5000):
+        # Use higher token limit for lesson planning to prevent truncation
+        super().__init__(temperature, max_tokens)
+    
     def get_prompt_template(self) -> PromptTemplate:
         return PromptTemplate(
-            input_variables=["curriculum_data", "subject", "skill_level", "rag_guidelines"],
+            input_variables=["curriculum_data", "subject", "subject_description", "skill_level", "rag_guidelines"],
             template="""
-Create lesson plans for {subject}.
+You are an expert lesson planner for {subject}: {subject_description}
+
+Create detailed lesson plans for {subject} at {skill_level} level.
 
 CURRICULUM: {curriculum_data}
 
-Return JSON:
+REQUIREMENTS:
+- All content must relate to {subject_description}
+- Include learning objectives and activities
+- Structure lessons with clear time allocation
+- Focus on practical skills for {subject_description}
+
+Return ONLY valid JSON in this exact format:
+
 {{
     "lesson_plans": [
         {{
             "lesson_id": 1,
-            "title": "Lesson Title"
+            "title": "Lesson title here",
+            "learning_objectives": [
+                "First learning objective",
+                "Second learning objective"
+            ],
+            "key_concepts": [
+                "First key concept",
+                "Second key concept"
+            ],
+            "activities": [
+                "First activity",
+                "Second activity"
+            ],
+            "structure": {{
+                "introduction": "10 minutes",
+                "main_content": "35 minutes",
+                "practice": "10 minutes",
+                "summary": "5 minutes"
+            }}
         }}
     ],
     "generated_at": "2024-01-15T10:00:00Z",
     "generation_stage": "lesson_plans_complete"
 }}
+
+CRITICAL JSON FORMATTING RULES:
+1. Return ONLY valid JSON - no additional text before or after
+2. Use double quotes for all strings
+3. No trailing commas
+4. Ensure all brackets and braces are properly closed
+5. Replace the example content with actual lesson plans for {subject}
+6. Do not include any explanatory text outside the JSON
+
+REMEMBER: You are creating lesson plans for {subject} which is {subject_description}. Every lesson plan element should be directly relevant to this subject area and avoid any programming references unless specifically about programming.
 """
         )
     
     def generate_lesson_plans(self, curriculum_data: Dict[str, Any], subject: str, rag_docs: List[str] = None) -> Dict[str, Any]:
         """Generate detailed lesson plans based on curriculum"""
         logger.info(f"Starting lesson plan generation for {subject}")
+        
+        # Get subject description
+        subject_description = self._get_subject_description(subject)
         
         # Extract curriculum information
         curriculum = curriculum_data.get("curriculum", {})
@@ -457,6 +590,7 @@ Return JSON:
         inputs = {
             "curriculum_data": curriculum_summary,
             "subject": subject,
+            "subject_description": subject_description,
             "skill_level": skill_level,
             "rag_guidelines": rag_guidelines
         }
@@ -519,37 +653,89 @@ Return JSON:
             summary += "\n"
         
         return summary
+    
+    def _get_subject_description(self, subject: str) -> str:
+        """Get subject description from AVAILABLE_SUBJECTS configuration"""
+        try:
+            # Import AVAILABLE_SUBJECTS from the subjects API
+            from app.api.subjects import AVAILABLE_SUBJECTS
+            
+            if subject in AVAILABLE_SUBJECTS:
+                description = AVAILABLE_SUBJECTS[subject].get('description', '')
+                if description:
+                    logger.debug(f"Found subject description for {subject}: {description}")
+                    return description
+            
+            # Fallback description if not found
+            logger.warning(f"No description found for subject {subject}, using generic description")
+            return f"Educational content related to {subject}"
+            
+        except ImportError as e:
+            logger.error(f"Could not import AVAILABLE_SUBJECTS: {e}")
+            return f"Educational content related to {subject}"
+        except Exception as e:
+            logger.error(f"Error getting subject description for {subject}: {e}")
+            return f"Educational content related to {subject}"
 
 class ContentGeneratorChain(ContentGenerationChain):
     """Chain for generating lesson content (Stage 3)"""
     
+    def __init__(self, temperature: float = 0.7, max_tokens: int = 6000):
+        # Use higher token limit for content generation (longest output)
+        super().__init__(temperature, max_tokens)
+    
     def get_prompt_template(self) -> PromptTemplate:
         return PromptTemplate(
-            input_variables=["lesson_plan", "subject", "skill_level", "rag_guidelines"],
+            input_variables=["lesson_plan", "subject", "subject_description", "skill_level", "rag_guidelines"],
             template="""
-Create lesson content for {subject} at {skill_level} level.
+You are an expert educator and content creator specializing in {subject}. Your role is to write educational lesson content specifically for the subject of {subject}, which is described as: {subject_description}
 
-LESSON PLAN:
+CRITICAL INSTRUCTIONS:
+- You are creating content for {subject} - {subject_description}
+- ALL content must be directly relevant to this subject area and description
+- Do NOT include programming, coding, or technical software content unless the subject is specifically about programming
+- Focus on the actual subject matter as described: {subject_description}
+
+SUBJECT DETAILS:
+- Subject: {subject}
+- Description: {subject_description}
+- Target Level: {skill_level}
+
+LESSON PLAN TO IMPLEMENT:
 {lesson_plan}
 
-GUIDELINES:
+CONTENT GUIDELINES:
 {rag_guidelines}
 
 REQUIREMENTS:
-1. Write clear explanations of key concepts
-2. Include 1-2 practical examples with code
-3. Create 2-3 simple exercises
-4. Use markdown formatting
-5. Keep content focused and concise
+1. Write clear explanations of key concepts that are specifically relevant to {subject_description}
+2. Include 1-2 practical examples that demonstrate real-world applications of {subject_description}
+3. Create 2-3 exercises that help learners practice {subject} skills as described in: {subject_description}
+4. Use markdown formatting for clear structure
+5. Keep content focused and directly applicable to {subject_description}
+6. Ensure every paragraph relates back to the core subject: {subject_description}
 
-STRUCTURE:
-# Lesson Title
+CONTENT STRUCTURE:
+# [Lesson Title - relevant to {subject}]
+
+## Introduction
+Brief introduction explaining how this lesson relates to {subject_description}
+
 ## Key Concepts
-## Example
-## Exercises
-## Summary
+Core concepts specific to {subject_description}
 
-Generate focused lesson content in markdown format.
+## Practical Example
+Real-world example demonstrating {subject_description} in action
+
+## Practice Exercises
+Hands-on activities that apply {subject_description} principles
+
+## Summary
+Key takeaways relevant to {subject_description}
+
+REMEMBER: You are creating educational content for {subject} which is {subject_description}. Every sentence should be relevant to this subject area. Avoid any programming or technical coding references unless the subject description specifically mentions programming or software development.
+
+Generate comprehensive lesson content in markdown format.
 """
         )
     
@@ -559,6 +745,9 @@ Generate focused lesson content in markdown format.
         lesson_title = lesson_plan.get("title", "Untitled Lesson")
         
         logger.info(f"Starting content generation for lesson {lesson_id}: {lesson_title}")
+        
+        # Get subject description from AVAILABLE_SUBJECTS
+        subject_description = self._get_subject_description(subject)
         
         # Extract lesson information
         learning_objectives = lesson_plan.get("learning_objectives", [])
@@ -581,6 +770,7 @@ Generate focused lesson content in markdown format.
         inputs = {
             "lesson_plan": lesson_plan_summary,
             "subject": subject,
+            "subject_description": subject_description,
             "skill_level": skill_level,
             "rag_guidelines": rag_guidelines
         }
@@ -681,3 +871,26 @@ Generate focused lesson content in markdown format.
             logger.warning(f"Content structure validation failed. Score: {structure_score}/7")
         
         return is_valid
+    
+    def _get_subject_description(self, subject: str) -> str:
+        """Get subject description from AVAILABLE_SUBJECTS configuration"""
+        try:
+            # Import AVAILABLE_SUBJECTS from the subjects API
+            from app.api.subjects import AVAILABLE_SUBJECTS
+            
+            if subject in AVAILABLE_SUBJECTS:
+                description = AVAILABLE_SUBJECTS[subject].get('description', '')
+                if description:
+                    logger.debug(f"Found subject description for {subject}: {description}")
+                    return description
+            
+            # Fallback description if not found
+            logger.warning(f"No description found for subject {subject}, using generic description")
+            return f"Educational content related to {subject}"
+            
+        except ImportError as e:
+            logger.error(f"Could not import AVAILABLE_SUBJECTS: {e}")
+            return f"Educational content related to {subject}"
+        except Exception as e:
+            logger.error(f"Error getting subject description for {subject}: {e}")
+            return f"Educational content related to {subject}"
