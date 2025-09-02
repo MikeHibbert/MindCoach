@@ -38,6 +38,13 @@ instance/
 
 # Environment variables
 .env
+.env.local
+.env.production
+.env.development
+frontend/.env
+frontend/.env.local
+frontend/.env.production
+frontend/.env.development
 
 # Node.js
 node_modules/
@@ -63,3 +70,6 @@ users/
 
 # Logs
 *.log
+*.log.*
+logs/
+logs/**/*
