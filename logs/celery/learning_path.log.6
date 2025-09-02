@@ -1,0 +1,30 @@
+2025-08-23 14:50:43,595 ERROR: Raw output (first 500 chars): {
+    "lesson_plans": [
+        {
+            "lesson_id": 1,
+            "title": "Intro to Custom Therapy",
+            "learning_objectives": ["Define custom therapy", "Review history", "List benefits"],
+            "structure": {"introduction": "10 min", "main_content": "30 min", "exercises": "15 min"},
+            "activities": ["Discuss definition", "Cover history", "Explore applications"],
+            "assessment": "Key points quiz",
+            "materials_needed": ["Handouts", "Slides"], [in /app/app/services/langchain_base.py:192]
+2025-08-23 14:50:43,639 WARNING: Returning minimal curriculum structure due to JSON parsing failure [in /app/app/services/langchain_base.py:201]
+2025-08-23 14:50:43,640 INFO: Generated result keys: ['curriculum', 'generated_at', 'generation_stage'] [in /app/app/services/langchain_chains.py:753]
+2025-08-23 14:50:43,642 INFO: Generated result type: <class 'dict'> [in /app/app/services/langchain_chains.py:754]
+2025-08-23 14:50:43,644 ERROR: Missing required keys in output: ['lesson_plans'] [in /app/app/services/langchain_chains.py:223]
+2025-08-23 14:50:43,645 WARNING: Validation failed. Result type: <class 'dict'>, keys: ['curriculum', 'generated_at', 'generation_stage'] [in /app/app/services/langchain_chains.py:759]
+2025-08-23 14:50:43,647 WARNING: Creating fallback lesson plans due to validation failure [in /app/app/services/langchain_chains.py:761]
+2025-08-23 14:50:43,648 WARNING: Creating fallback lesson plans due to AI generation failure [in /app/app/services/langchain_chains.py:846]
+2025-08-23 14:50:43,650 INFO: Successfully generated 10 lesson plans for custom_therapy_demo-user [in /app/app/services/langchain_chains.py:792]
+2025-08-23 14:50:43,652 INFO: Stage 2 completed: Lesson plans generated for custom_therapy_demo-user [in /app/app/services/langchain_pipeline.py:82]
+2025-08-23 14:50:43,653 INFO: Pipeline Stage 3: Generating lesson content [in /app/app/services/langchain_pipeline.py:137]
+2025-08-23 14:50:43,654 INFO: Starting Stage 3: Content generation for lesson 1 in custom_therapy_demo-user [in /app/app/services/langchain_pipeline.py:92]
+2025-08-23 14:50:43,656 INFO: Starting content generation for lesson 1: Introduction to Custom Therapy [in /app/app/services/langchain_chains.py:976]
+2025-08-23 14:51:05,941 INFO: Successfully generated content for lesson 1 (10829 characters) [in /app/app/services/langchain_chains.py:1013]
+2025-08-23 14:51:05,943 INFO: Stage 3 completed: Content generated for lesson 1 [in /app/app/services/langchain_pipeline.py:96]
+2025-08-23 14:51:05,944 INFO: Starting Stage 3: Content generation for lesson 2 in custom_therapy_demo-user [in /app/app/services/langchain_pipeline.py:92]
+2025-08-23 14:51:05,945 INFO: Starting content generation for lesson 2: Basic Principles of Custom Therapy [in /app/app/services/langchain_chains.py:976]
+2025-08-23 14:51:30,649 INFO: Successfully generated content for lesson 2 (11131 characters) [in /app/app/services/langchain_chains.py:1013]
+2025-08-23 14:51:30,650 INFO: Stage 3 completed: Content generated for lesson 2 [in /app/app/services/langchain_pipeline.py:96]
+2025-08-23 14:51:30,651 INFO: Starting Stage 3: Content generation for lesson 3 in custom_therapy_demo-user [in /app/app/services/langchain_pipeline.py:92]
+2025-08-23 14:51:30,652 INFO: Starting content generation for lesson 3: Identifying Client Needs [in /app/app/services/langchain_chains.py:976]
