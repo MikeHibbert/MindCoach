@@ -5,6 +5,7 @@ from flask import Blueprint, jsonify
 from app import db
 from app.services.performance_service import performance_monitor
 from app.services.cache_service import cache
+from sqlalchemy import text
 import time
 import os
 
@@ -15,7 +16,7 @@ def health_check():
     """Basic health check endpoint"""
     try:
         # Check database connectivity
-        db.session.execute('SELECT 1')
+        db.session.execute(text('SELECT 1'))
         db_status = 'healthy'
     except Exception as e:
         db_status = f'unhealthy: {str(e)}'
@@ -86,7 +87,7 @@ def readiness_check():
     """Readiness check for Kubernetes/container orchestration"""
     try:
         # Check if application is ready to serve requests
-        db.session.execute('SELECT 1')
+        db.session.execute(text('SELECT 1'))
         
         # Check if required directories exist
         required_dirs = ['users', 'logs']

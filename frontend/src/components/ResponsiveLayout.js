@@ -116,7 +116,7 @@ const ResponsiveLayout = ({ children }) => {
       </a>
 
       {/* Desktop Layout - Sidebar + Main Content */}
-      <div className="hidden desktop:flex">
+      <div className="hidden lg:flex">
         {/* Desktop Sidebar */}
         <nav 
           className="w-64 bg-white shadow-lg border-r-2 border-gray-200 flex flex-col"
@@ -182,7 +182,7 @@ const ResponsiveLayout = ({ children }) => {
       </div>
       
       {/* Tablet Layout - Stacked with larger touch targets */}
-      <div className="hidden tablet:block desktop:hidden">
+      <div className="hidden md:block lg:hidden">
         <header className="bg-white shadow-sm border-b-2 border-gray-200 sticky top-0 z-10">
           <div className="px-6 py-4">
             <div className="flex items-center justify-between">
@@ -244,7 +244,7 @@ const ResponsiveLayout = ({ children }) => {
       </div>
       
       {/* Mobile Layout - Single column with hamburger menu */}
-      <div className="block tablet:hidden">
+      <div className="block md:hidden">
         <header className="bg-white shadow-sm border-b-2 border-gray-200 sticky top-0 z-20">
           <div className="px-4 py-3">
             <div className="flex items-center justify-between">

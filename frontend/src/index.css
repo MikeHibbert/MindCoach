@@ -77,6 +77,23 @@
     top: 6px;
   }
   
+  /* Focus visible only - hidden until focused */
+  .focus-visible-only {
+    position: absolute;
+    top: -40px;
+    left: 6px;
+    background: #000;
+    color: #fff;
+    padding: 8px;
+    text-decoration: none;
+    z-index: 1000;
+    border-radius: 4px;
+  }
+  
+  .focus-visible-only:focus {
+    top: 6px;
+  }
+  
   /* Reduced motion support */
   @media (prefers-reduced-motion: reduce) {
     *,

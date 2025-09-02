@@ -1,41 +1,32 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { 
-  announceToScreenReader, 
-  keyboardNavigation, 
-  ariaLabels, 
-  formAccessibility,
-  touchTargets 
-} from '../utils/accessibility';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
 
-const SubjectSelector = ({ userId, onSubjectSelect }) => {
+const SubjectSelector = ({ onSubjectSelect }) => {
+  const { user, authenticatedFetch } = useAuth();
   const [subjects, setSubjects] = useState([]);
   const [selectedSubject, setSelectedSubject] = useState(null);
-  const [viewMode, setViewMode] = useState('grid'); // 'grid' or 'dropdown'
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [focusedCardIndex, setFocusedCardIndex] = useState(-1);
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [newSubject, setNewSubject] = useState({ name: '', description: '' });
+  const [addingSubject, setAddingSubject] = useState(false);
+  const navigate = useNavigate();
   
-  // Refs for accessibility
-  const cardRefs = useRef([]);
-  const dropdownRef = useRef(null);
-  const errorRef = useRef(null);
-  const statusRef = useRef(null);
+  const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000/api';
 
-  // Fetch subjects on component mount
-  useEffect(() => {
-    fetchSubjects();
-  }, [userId]);
-
-  const fetchSubjects = async () => {
+  const fetchSubjects = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
       
-      const url = userId 
-        ? `/api/subjects?user_id=${encodeURIComponent(userId)}`
-        : '/api/subjects';
+      const url = user 
+        ? `${API_BASE_URL}/subjects?user_id=${encodeURIComponent(user.user_id)}`
+        : `${API_BASE_URL}/subjects`;
       
-      const response = await fetch(url);
+      const response = user 
+        ? await authenticatedFetch(url)
+        : await fetch(url);
       const data = await response.json();
       
       if (!response.ok) {
@@ -49,133 +40,90 @@ const SubjectSelector = ({ userId, onSubjectSelect }) => {
     } finally {
       setLoading(false);
     }
+  }, [user, authenticatedFetch]);
+
+  // Fetch subjects on component mount
+  useEffect(() => {
+    fetchSubjects();
+  }, [fetchSubjects]);
+
+  const handleSubjectSelect = (subject) => {
+    setSelectedSubject(subject);
+    
+    if (user) {
+      // Navigate to survey for authenticated users
+      navigate(`/users/${user.user_id}/subjects/${subject.id}/survey`);
+    } else {
+      // Navigate to survey for anonymous users
+      navigate(`/subjects/${subject.id}/survey`);
+    }
+    
+    if (onSubjectSelect) {
+      onSubjectSelect(subject);
+    }
   };
 
-  const handleSubjectSelect = async (subject) => {
-    if (subject.locked) {
-      // Announce that subject is locked
-      announceToScreenReader(`${subject.name} requires a subscription and cannot be selected`);
+  const handleAddSubject = async (e) => {
+    e.preventDefault();
+    if (!newSubject.name.trim() || !newSubject.description.trim()) {
+      setError('Please fill in both name and description');
       return;
     }
 
     try {
-      setError(null); // Clear any previous errors
-      setSelectedSubject(subject);
-      
-      // Announce selection to screen readers
-      announceToScreenReader(`Selected ${subject.name}`);
-      
-      // Persist subject selection to backend if userId is provided
-      if (userId) {
-        const response = await fetch(`/api/users/${encodeURIComponent(userId)}/subjects/${encodeURIComponent(subject.id)}/select`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        });
+      setAddingSubject(true);
+      setError(null);
 
-        if (!response.ok) {
-          const errorData = await response.json();
-          
-          // Handle subscription required error
-          if (response.status === 402) {
-            const errorMessage = `Subscription required for ${subject.name}. ${errorData.error?.message || ''}`;
-            setError(errorMessage);
-            setSelectedSubject(null);
-            announceToScreenReader(errorMessage, 'assertive');
-            return;
-          }
-          
-          throw new Error(errorData.error?.message || 'Failed to select subject');
-        }
+      const response = user 
+        ? await authenticatedFetch(`${API_BASE_URL}/subjects`, {
+            method: 'POST',
+            body: JSON.stringify(newSubject)
+          })
+        : await fetch(`${API_BASE_URL}/subjects`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(newSubject)
+          });
 
-        const data = await response.json();
-        console.log('Subject selection saved:', data);
-        announceToScreenReader(`${subject.name} selection saved successfully`);
-      }
+      const data = await response.json();
       
-      // Call parent callback if provided (always call it after successful selection)
-      if (onSubjectSelect) {
-        onSubjectSelect(subject);
+      if (!response.ok) {
+        throw new Error(data.error?.message || 'Failed to add subject');
       }
+
+      // Add the new subject to the list
+      setSubjects(prev => [...prev, data.subject]);
+      setNewSubject({ name: '', description: '' });
+      setShowAddForm(false);
+      
     } catch (err) {
-      console.error('Error selecting subject:', err);
-      const errorMessage = err.message || 'Failed to select subject';
-      setError(errorMessage);
-      setSelectedSubject(null);
-      announceToScreenReader(`Error: ${errorMessage}`, 'assertive');
-      // Don't call onSubjectSelect callback on error
+      console.error('Error adding subject:', err);
+      setError(err.message);
+    } finally {
+      setAddingSubject(false);
     }
   };
 
-  // Handle keyboard navigation for subject cards
-  const handleCardKeyDown = (e, index) => {
-    keyboardNavigation.handleArrowKeys(
-      e,
-      subjects,
-      index,
-      (newIndex) => {
-        setFocusedCardIndex(newIndex);
-        cardRefs.current[newIndex]?.focus();
-      }
-    );
 
-    // Handle activation
-    keyboardNavigation.handleActivation(e, () => {
-      handleSubjectSelect(subjects[index]);
-    });
-  };
 
-  // Generate form field IDs for accessibility
-  const dropdownFieldIds = formAccessibility.generateFieldIds('subject-dropdown');
-
-  const SubjectCard = ({ subject, isSelected, onClick, index }) => {
-    const cardId = `subject-card-${subject.id}`;
-    const descriptionId = `subject-${subject.id}-description`;
-    const statusId = `subject-${subject.id}-status`;
-    
+  const SubjectCard = ({ subject, isSelected, onClick }) => {
     return (
       <div
-        ref={(el) => cardRefs.current[index] = el}
-        id={cardId}
         className={`
-          relative p-6 rounded-lg border-2 transition-all duration-200 cursor-pointer touch-target
-          ${subject.locked 
-            ? 'border-gray-400 bg-gray-100 cursor-not-allowed opacity-70' 
-            : isSelected
-              ? 'border-blue-600 bg-blue-50 shadow-md'
-              : 'border-gray-300 bg-white hover:border-blue-400 hover:shadow-sm'
+          relative p-6 rounded-lg border-2 transition-all duration-200 cursor-pointer
+          ${isSelected
+            ? 'border-blue-600 bg-blue-50 shadow-md'
+            : 'border-gray-300 bg-white hover:border-blue-400 hover:shadow-sm'
           }
-          ${!subject.locked ? 'focus:outline-none focus:ring-3 focus:ring-blue-500 focus:ring-offset-2' : ''}
+          focus:outline-none focus:ring-3 focus:ring-blue-500 focus:ring-offset-2
         `}
-        onClick={() => !subject.locked && onClick(subject)}
-        onKeyDown={(e) => handleCardKeyDown(e, index)}
-        tabIndex={subject.locked ? -1 : 0}
+        onClick={() => onClick(subject)}
+        tabIndex={0}
         role="button"
         aria-pressed={isSelected}
-        aria-disabled={subject.locked}
-        aria-describedby={`${descriptionId} ${statusId}`}
-        aria-label={`${subject.name}. ${subject.description}. ${subject.locked ? 'Subscription required' : 'Available'}`}
       >
-        {/* Lock indicator */}
-        {subject.locked && (
-          <div className="absolute top-3 right-3" aria-hidden="true">
-            <svg
-              className="w-6 h-6 text-gray-500"
-              fill="currentColor"
-              viewBox="0 0 20 20"
-            >
-              <path
-                fillRule="evenodd"
-                d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z"
-                clipRule="evenodd"
-              />
-            </svg>
-          </div>
-        )}
-        
         {/* Selection indicator */}
-        {isSelected && !subject.locked && (
+        {isSelected && (
           <div className="absolute top-3 right-3" aria-hidden="true">
             <svg
               className="w-6 h-6 text-blue-700"
@@ -192,141 +140,54 @@ const SubjectSelector = ({ userId, onSubjectSelect }) => {
         )}
 
         <div className="mb-3">
-          <h3 className={`text-lg font-semibold ${subject.locked ? 'text-gray-600' : 'text-gray-900'}`}>
+          <h3 className="text-lg font-semibold text-gray-900">
             {subject.name}
           </h3>
         </div>
         
-        <p 
-          id={descriptionId}
-          className={`text-sm mb-4 ${subject.locked ? 'text-gray-500' : 'text-gray-700'}`}
-        >
+        <p className="text-sm mb-4 text-gray-700">
           {subject.description}
         </p>
         
         <div className="flex items-center justify-between">
           <div className="text-sm">
-            <span 
-              id={statusId}
-              className={`font-medium ${
-                subject.locked 
-                  ? 'text-gray-600' 
-                  : 'text-blue-700'
-              }`}
-            >
-              {subject.locked ? 'Subscription Required' : 'Available'}
+            <span className="font-medium text-blue-700">
+              Available
             </span>
           </div>
-          
-          <div className="text-right">
-            <div className={`text-sm ${subject.locked ? 'text-gray-500' : 'text-gray-700'}`}>
-              From ${subject.pricing?.monthly}/month
-            </div>
-          </div>
         </div>
-    </div>
-  );
-
-  const SubjectDropdown = ({ subjects, selectedSubject, onSelect, fieldIds, labelText }) => {
-    const fieldAria = formAccessibility.getFieldAria(fieldIds, !!error, false);
-    
-    return (
-      <div className="relative">
-        <label 
-          id={fieldIds.labelId}
-          htmlFor={fieldIds.fieldId}
-          className="block text-sm font-medium text-gray-900 mb-2"
-        >
-          {labelText}
-        </label>
-        <select
-          ref={dropdownRef}
-          {...fieldAria}
-          value={selectedSubject?.id || ''}
-          onChange={(e) => {
-            const subject = subjects.find(s => s.id === e.target.value);
-            if (subject && !subject.locked) {
-              onSelect(subject);
-            } else if (subject && subject.locked) {
-              announceToScreenReader(`${subject.name} requires a subscription`, 'assertive');
-            }
-          }}
-          className={`input-field ${error ? 'input-field-error' : ''}`}
-          aria-label={ariaLabels.fieldDescription('Programming subject selection', true, 'Choose from available subjects')}
-        >
-          <option value="">Choose a subject...</option>
-          {subjects.map((subject) => (
-            <option 
-              key={subject.id} 
-              value={subject.id}
-              disabled={subject.locked}
-            >
-              {subject.name} {subject.locked ? '(Subscription Required)' : ''}
-            </option>
-          ))}
-        </select>
-        {error && (
-          <div 
-            id={fieldIds.errorId}
-            className="mt-2 text-sm text-red-700"
-            role="alert"
-            aria-live="polite"
-          >
-            {error}
-          </div>
-        )}
       </div>
     );
   };
 
   if (loading) {
     return (
-      <div className="max-w-4xl mx-auto">
-        <h2 className="text-2xl font-bold text-gray-900 mb-6">Select a Subject</h2>
-        <div className="flex items-center justify-center py-12" role="status" aria-live="polite">
-          <div 
-            className="loading-spinner h-8 w-8 border-blue-600" 
-            aria-hidden="true"
-          ></div>
-          <span className="ml-3 text-gray-700">Loading subjects...</span>
-          <span className="sr-only">Loading available subjects, please wait</span>
-        </div>
+      <div className="flex justify-center items-center py-12">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="max-w-4xl mx-auto">
-        <h2 className="text-2xl font-bold text-gray-900 mb-6">Select a Subject</h2>
-        <div 
-          ref={errorRef}
-          className="error-message"
-          role="alert"
-          aria-live="assertive"
-        >
-          <div className="flex">
-            <svg
-              className="w-6 h-6 text-red-700 mt-0.5 flex-shrink-0"
-              fill="currentColor"
-              viewBox="0 0 20 20"
-              aria-hidden="true"
-            >
-              <path
-                fillRule="evenodd"
-                d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
-                clipRule="evenodd"
-              />
+      <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+        <div className="flex">
+          <div className="flex-shrink-0">
+            <svg className="h-5 w-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
             </svg>
-            <div className="ml-3">
-              <h3 className="text-sm font-medium text-red-900">Error loading subjects</h3>
-              <p className="text-sm text-red-800 mt-1">{error}</p>
+          </div>
+          <div className="ml-3">
+            <h3 className="text-sm font-medium text-red-800">Error loading subjects</h3>
+            <div className="mt-2 text-sm text-red-700">
+              <p>{error}</p>
+            </div>
+            <div className="mt-4">
               <button
                 onClick={fetchSubjects}
-                className="mt-3 btn-secondary focus:ring-red-500"
-                aria-label="Retry loading subjects"
+                className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-red-700 bg-red-100 hover:bg-red-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
               >
-                Try again
+                Try Again
               </button>
             </div>
           </div>
@@ -336,137 +197,104 @@ const SubjectSelector = ({ userId, onSubjectSelect }) => {
   }
 
   return (
-    <div className="max-w-4xl mx-auto">
-      <div className="mb-6">
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">Select a Subject</h2>
-        <p className="text-gray-600">
-          Choose a programming subject to begin your personalized learning journey.
-        </p>
-      </div>
-
-      {/* View mode toggle - Hidden on mobile, shows dropdown by default */}
-      <div className="hidden tablet:flex justify-between items-center mb-6">
-        <div className="text-sm text-gray-600">
-          {subjects.length} subjects available
+    <div className="space-y-6">
+      <div className="flex justify-between items-start">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Choose Your Subject</h2>
+          <p className="text-gray-600">Select a subject to start your personalized learning journey.</p>
         </div>
-        
-        <div className="flex rounded-lg border border-gray-300 overflow-hidden">
-          <button
-            onClick={() => setViewMode('grid')}
-            className={`px-4 py-2 text-sm font-medium transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 ${
-              viewMode === 'grid'
-                ? 'bg-primary-600 text-white'
-                : 'bg-white text-gray-700 hover:bg-gray-50'
-            }`}
-            aria-pressed={viewMode === 'grid'}
-          >
-            <svg className="w-4 h-4 mr-2 inline" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
-              <path d="M5 3a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2V5a2 2 0 00-2-2H5zM5 11a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2v-2a2 2 0 00-2-2H5zM11 5a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V5zM11 13a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
-            </svg>
-            Grid
-          </button>
-          <button
-            onClick={() => setViewMode('dropdown')}
-            className={`px-4 py-2 text-sm font-medium transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 ${
-              viewMode === 'dropdown'
-                ? 'bg-primary-600 text-white'
-                : 'bg-white text-gray-700 hover:bg-gray-50'
-            }`}
-            aria-pressed={viewMode === 'dropdown'}
-          >
-            <svg className="w-4 h-4 mr-2 inline" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
-              <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
-            </svg>
-            List
-          </button>
-        </div>
-      </div>
-
-      {/* Mobile: Always show dropdown */}
-      <div className="block tablet:hidden mb-6">
-        <SubjectDropdown
-          subjects={subjects}
-          selectedSubject={selectedSubject}
-          onSelect={handleSubjectSelect}
-          fieldIds={dropdownFieldIds}
-          labelText="Choose a subject:"
-        />
-      </div>
-
-      {/* Tablet/Desktop: Show based on view mode */}
-      <div className="hidden tablet:block">
-        {viewMode === 'dropdown' ? (
-          <div className="mb-6">
-            <SubjectDropdown
-              subjects={subjects}
-              selectedSubject={selectedSubject}
-              onSelect={handleSubjectSelect}
-              fieldIds={dropdownFieldIds}
-              labelText="Choose a subject:"
-            />
-          </div>
-        ) : (
-          <div 
-            className="grid grid-cols-1 tablet:grid-cols-2 desktop:grid-cols-3 gap-6"
-            role="group"
-            aria-label="Available programming subjects"
-          >
-            {subjects.map((subject, index) => (
-              <SubjectCard
-                key={subject.id}
-                subject={subject}
-                isSelected={selectedSubject?.id === subject.id}
-                onClick={handleSubjectSelect}
-                index={index}
-              />
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Selected subject confirmation */}
-      {selectedSubject && (
-        <div 
-          ref={statusRef}
-          className="mt-8 success-message"
-          role="status"
-          aria-live="polite"
+        <button
+          onClick={() => setShowAddForm(!showAddForm)}
+          className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
         >
-          <div className="flex items-start">
-            <svg
-              className="w-6 h-6 text-green-700 mt-0.5 flex-shrink-0"
-              fill="currentColor"
-              viewBox="0 0 20 20"
-              aria-hidden="true"
-            >
-              <path
-                fillRule="evenodd"
-                d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                clipRule="evenodd"
+          <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+          </svg>
+          Add Subject
+        </button>
+      </div>
+
+      {/* Add Subject Form */}
+      {showAddForm && (
+        <div className="bg-white p-6 rounded-lg border-2 border-gray-200 shadow-sm">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Add New Subject</h3>
+          <form onSubmit={handleAddSubject} className="space-y-4">
+            <div>
+              <label htmlFor="subject-name" className="block text-sm font-medium text-gray-700 mb-1">
+                Subject Name
+              </label>
+              <input
+                id="subject-name"
+                type="text"
+                value={newSubject.name}
+                onChange={(e) => setNewSubject(prev => ({ ...prev, name: e.target.value }))}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                placeholder="e.g., Python Programming"
+                required
               />
-            </svg>
-            <div className="ml-3">
-              <h3 className="text-sm font-medium text-green-900">
-                {selectedSubject.name} Selected
-              </h3>
-              <p className="text-sm text-green-800 mt-1">
-                You can now proceed to take the knowledge assessment survey.
-              </p>
             </div>
-          </div>
+            <div>
+              <label htmlFor="subject-description" className="block text-sm font-medium text-gray-700 mb-1">
+                Description
+              </label>
+              <textarea
+                id="subject-description"
+                value={newSubject.description}
+                onChange={(e) => setNewSubject(prev => ({ ...prev, description: e.target.value }))}
+                rows={3}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                placeholder="Brief description of what this subject covers..."
+                required
+              />
+            </div>
+            <div className="flex justify-end space-x-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowAddForm(false);
+                  setNewSubject({ name: '', description: '' });
+                  setError(null);
+                }}
+                className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={addingSubject}
+                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {addingSubject ? (
+                  <>
+                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Adding...
+                  </>
+                ) : (
+                  'Add Subject'
+                )}
+              </button>
+            </div>
+          </form>
         </div>
       )}
 
-      {/* Empty state */}
-      {subjects.length === 0 && (
+      {subjects.length > 0 ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {subjects.map((subject) => (
+            <SubjectCard
+              key={subject.id}
+              subject={subject}
+              isSelected={selectedSubject?.id === subject.id}
+              onClick={handleSubjectSelect}
+            />
+          ))}
+        </div>
+      ) : !loading && (
         <div className="text-center py-12">
-          <svg
-            className="mx-auto h-12 w-12 text-gray-400"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            aria-hidden="true"
-          >
+          <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path
               strokeLinecap="round"
               strokeLinejoin="round"

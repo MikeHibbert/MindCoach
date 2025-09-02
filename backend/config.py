@@ -51,19 +51,24 @@ class ProductionConfig(Config):
     SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or 'sqlite:///learning_path_prod.db'
     
     # Production security settings
-    SECRET_KEY = os.environ.get('SECRET_KEY')
-    if not SECRET_KEY:
-        raise ValueError("SECRET_KEY environment variable must be set in production")
+    SECRET_KEY = os.environ.get('SECRET_KEY') or 'fallback-secret-key'
     
     # xAI API validation for production
     XAI_API_KEY = os.environ.get('XAI_API_KEY')
-    if not XAI_API_KEY:
-        raise ValueError("XAI_API_KEY environment variable must be set in production")
+    
+    def __init__(self):
+        super().__init__()
+        # Only validate in production when this config is actually used
+        if not os.environ.get('SECRET_KEY'):
+            raise ValueError("SECRET_KEY environment variable must be set in production")
+        if not self.XAI_API_KEY:
+            raise ValueError("XAI_API_KEY environment variable must be set in production")
+        cors_origins = os.environ.get('CORS_ORIGINS', '')
+        if not cors_origins:
+            raise ValueError("CORS_ORIGINS environment variable must be set in production")
     
     # Production CORS settings
-    CORS_ORIGINS = os.environ.get('CORS_ORIGINS', '').split(',')
-    if not CORS_ORIGINS or CORS_ORIGINS == ['']:
-        raise ValueError("CORS_ORIGINS environment variable must be set in production")
+    CORS_ORIGINS = os.environ.get('CORS_ORIGINS', 'http://localhost:3000').split(',')
     
     # Production performance settings
     SQLALCHEMY_ENGINE_OPTIONS = {

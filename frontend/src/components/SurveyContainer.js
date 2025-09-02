@@ -24,18 +24,29 @@ const SurveyContainer = () => {
   }, [userId, subject]);
 
   const loadSurvey = async (forceGenerate = false) => {
-    if (!userId || !subject) {
-      setError('Missing user ID or subject parameter');
+    if (!subject) {
+      setError('Missing subject parameter');
       setIsLoading(false);
       return;
     }
+
+    // For anonymous users, use a default user ID
+    const effectiveUserId = userId || 'anonymous';
 
     try {
       setIsLoading(true);
       setError(null);
 
+      // Test API connection first
+      console.log('Testing API connection...');
+      const isConnected = await SurveyService.testConnection();
+      if (!isConnected) {
+        throw new Error('Cannot connect to the backend API. Please ensure the backend server is running.');
+      }
+
+      console.log('API connection successful, loading survey...');
       const survey = await SurveyService.getOrGenerateSurvey(
-        userId, 
+        effectiveUserId, 
         subject, 
         forceGenerate
       );
@@ -55,9 +66,11 @@ const SurveyContainer = () => {
   };
 
   const handleSurveySubmit = async (submissionData) => {
-    if (!userId || !subject) {
-      throw new Error('Missing user ID or subject');
+    if (!subject) {
+      throw new Error('Missing subject');
     }
+
+    const effectiveUserId = userId || 'anonymous';
 
     try {
       setIsSubmitting(true);
@@ -65,7 +78,7 @@ const SurveyContainer = () => {
 
       // Submit survey answers
       const results = await SurveyService.submitSurvey(
-        userId,
+        effectiveUserId,
         subject,
         submissionData
       );
@@ -74,11 +87,15 @@ const SurveyContainer = () => {
       console.log('Survey submitted successfully:', results);
       
       // Navigate to results page or next step
-      navigate(`/users/${userId}/subjects/${subject}/results`, {
+      const resultsPath = userId 
+        ? `/users/${userId}/subjects/${subject}/results`
+        : `/subjects/${subject}/results`;
+      
+      navigate(resultsPath, {
         state: { 
           surveyResults: results,
           subject: subject,
-          userId: userId
+          userId: effectiveUserId
         }
       });
 

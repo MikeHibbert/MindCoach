@@ -1765,8 +1765,8 @@ These concepts are fundamental to understanding how JavaScript works under the h
             lesson_config['priority'] = cls._calculate_lesson_priority(template, strengths, weaknesses)
             lesson_plan.append(lesson_config)
         
-        # Add lessons from other skill levels if needed to reach 10 lessons
-        if len(lesson_plan) < 10:
+        # Add lessons from other skill levels if needed to reach 5 lessons
+        if len(lesson_plan) < 5:
             # Add from higher skill level if user is doing well
             if skill_level == 'beginner' and len(strengths) > len(weaknesses):
                 intermediate_templates = available_templates.get('intermediate', {})
@@ -1791,9 +1791,9 @@ These concepts are fundamental to understanding how JavaScript works under the h
                     lesson_config['priority'] = cls._calculate_lesson_priority(template, strengths, weaknesses)
                     lesson_plan.append(lesson_config)
         
-        # Sort by priority (higher priority first) and limit to 10 lessons
+        # Sort by priority (higher priority first) and limit to 5 lessons
         lesson_plan.sort(key=lambda x: x['priority'], reverse=True)
-        return lesson_plan[:10]
+        return lesson_plan[:5]
     
     @classmethod
     def _calculate_lesson_priority(cls, template: Dict[str, Any], strengths: set, weaknesses: set) -> float:

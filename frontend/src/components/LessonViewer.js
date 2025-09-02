@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { useParams } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
@@ -12,10 +13,18 @@ import {
   focusManagement 
 } from '../utils/accessibility';
 
-const LessonViewer = ({ userId, subject, initialLessonNumber = 1 }) => {
+const LessonViewer = ({ userId: propUserId, subject: propSubject, initialLessonNumber = 1 }) => {
+  // Extract URL parameters
+  const { userId: urlUserId, subject: urlSubject, lessonId } = useParams();
+  
+  // Use URL parameters if available, otherwise use props (for backward compatibility)
+  const userId = urlUserId || propUserId || 'anonymous';
+  const subject = urlSubject || propSubject;
   const [lessons, setLessons] = useState([]);
   const [currentLesson, setCurrentLesson] = useState(null);
-  const [currentLessonNumber, setCurrentLessonNumber] = useState(initialLessonNumber);
+  const [currentLessonNumber, setCurrentLessonNumber] = useState(
+    lessonId ? parseInt(lessonId) : initialLessonNumber
+  );
   const [progress, setProgress] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -39,6 +48,7 @@ const LessonViewer = ({ userId, subject, initialLessonNumber = 1 }) => {
 
   // Load lesson list and progress on component mount
   useEffect(() => {
+    console.log('LessonViewer mounted with:', { userId, subject, urlUserId, urlSubject });
     if (userId && subject) {
       loadLessonList();
       loadProgress();

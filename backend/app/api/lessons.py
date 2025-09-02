@@ -33,20 +33,29 @@ def generate_lessons(user_id, subject):
         
         logger.info(f"Generating lessons for user {user_id}, subject {subject}")
         
-        # Check if user has active subscription for the subject
+        # Check if user has active subscription for the subject (skip for free subjects)
         try:
-            has_subscription = SubscriptionService.has_active_subscription(user_id, subject)
-            if not has_subscription:
-                logger.warning(f"User {user_id} attempted to generate lessons for {subject} without subscription")
-                return jsonify({
-                    'success': False,
-                    'error': 'subscription_required',
-                    'message': f'Active subscription required for {subject}',
-                    'details': {
-                        'subject': subject,
-                        'user_id': user_id
-                    }
-                }), 403
+            # Check if subject is free (price is 0.00)
+            from app.api.subscriptions import AVAILABLE_SUBJECTS
+            is_free_subject = (subject in AVAILABLE_SUBJECTS and 
+                             AVAILABLE_SUBJECTS[subject].get('price_monthly', 0) == 0.00)
+            
+            if not is_free_subject:
+                has_subscription = SubscriptionService.has_active_subscription(user_id, subject)
+                if not has_subscription:
+                    logger.warning(f"User {user_id} attempted to generate lessons for {subject} without subscription")
+                    return jsonify({
+                        'success': False,
+                        'error': 'subscription_required',
+                        'message': f'Active subscription required for {subject}',
+                        'details': {
+                            'subject': subject,
+                            'user_id': user_id
+                        }
+                    }), 403
+            else:
+                logger.info(f"Allowing free access to subject {subject} for user {user_id}")
+                
         except Exception as e:
             logger.error(f"Error checking subscription for {user_id} - {subject}: {str(e)}")
             # Continue with lesson generation if subscription check fails (graceful degradation)
@@ -135,20 +144,29 @@ def list_lessons(user_id, subject):
         
         logger.info(f"Listing lessons for user {user_id}, subject {subject}")
         
-        # Check if user has active subscription for the subject
+        # Check if user has active subscription for the subject (skip for free subjects)
         try:
-            has_subscription = SubscriptionService.has_active_subscription(user_id, subject)
-            if not has_subscription:
-                logger.warning(f"User {user_id} attempted to access lessons for {subject} without subscription")
-                return jsonify({
-                    'success': False,
-                    'error': 'subscription_required',
-                    'message': f'Active subscription required for {subject}',
-                    'details': {
-                        'subject': subject,
-                        'user_id': user_id
-                    }
-                }), 403
+            # Check if subject is free (price is 0.00)
+            from app.api.subscriptions import AVAILABLE_SUBJECTS
+            is_free_subject = (subject in AVAILABLE_SUBJECTS and 
+                             AVAILABLE_SUBJECTS[subject].get('price_monthly', 0) == 0.00)
+            
+            if not is_free_subject:
+                has_subscription = SubscriptionService.has_active_subscription(user_id, subject)
+                if not has_subscription:
+                    logger.warning(f"User {user_id} attempted to access lessons for {subject} without subscription")
+                    return jsonify({
+                        'success': False,
+                        'error': 'subscription_required',
+                        'message': f'Active subscription required for {subject}',
+                        'details': {
+                            'subject': subject,
+                            'user_id': user_id
+                        }
+                    }), 403
+            else:
+                logger.info(f"Allowing free access to subject {subject} for user {user_id}")
+                
         except Exception as e:
             logger.error(f"Error checking subscription for {user_id} - {subject}: {str(e)}")
             # Continue with lesson listing if subscription check fails (graceful degradation)
@@ -207,21 +225,30 @@ def get_lesson(user_id, subject, lesson_number):
         
         logger.info(f"Retrieving lesson {lesson_number} for user {user_id}, subject {subject}")
         
-        # Check if user has active subscription for the subject
+        # Check if user has active subscription for the subject (skip for free subjects)
         try:
-            has_subscription = SubscriptionService.has_active_subscription(user_id, subject)
-            if not has_subscription:
-                logger.warning(f"User {user_id} attempted to access lesson {lesson_number} for {subject} without subscription")
-                return jsonify({
-                    'success': False,
-                    'error': 'subscription_required',
-                    'message': f'Active subscription required for {subject}',
-                    'details': {
-                        'subject': subject,
-                        'user_id': user_id,
-                        'lesson_number': lesson_number
-                    }
-                }), 403
+            # Check if subject is free (price is 0.00)
+            from app.api.subscriptions import AVAILABLE_SUBJECTS
+            is_free_subject = (subject in AVAILABLE_SUBJECTS and 
+                             AVAILABLE_SUBJECTS[subject].get('price_monthly', 0) == 0.00)
+            
+            if not is_free_subject:
+                has_subscription = SubscriptionService.has_active_subscription(user_id, subject)
+                if not has_subscription:
+                    logger.warning(f"User {user_id} attempted to access lesson {lesson_number} for {subject} without subscription")
+                    return jsonify({
+                        'success': False,
+                        'error': 'subscription_required',
+                        'message': f'Active subscription required for {subject}',
+                        'details': {
+                            'subject': subject,
+                            'user_id': user_id,
+                            'lesson_number': lesson_number
+                        }
+                    }), 403
+            else:
+                logger.info(f"Allowing free access to subject {subject} for user {user_id}")
+                
         except Exception as e:
             logger.error(f"Error checking subscription for {user_id} - {subject}: {str(e)}")
             # Continue with lesson retrieval if subscription check fails (graceful degradation)
@@ -355,7 +382,7 @@ def get_lesson_progress(user_id, subject):
         total_lessons = lesson_list['total_lessons']
         available_lessons = sum(1 for lesson in lesson_list['lessons'] if lesson.get('file_exists', False))
         
-        progress_percentage = (available_lessons / 10) * 100 if total_lessons > 0 else 0  # Assuming max 10 lessons
+        progress_percentage = (available_lessons / 5) * 100 if total_lessons > 0 else 0  # Assuming max 5 lessons
         
         progress_summary = {
             'user_id': user_id,
@@ -423,20 +450,29 @@ def generate_lessons_langchain(user_id, subject):
         
         logger.info(f"Starting LangChain lesson generation for user {user_id}, subject {subject}")
         
-        # Check if user has active subscription for the subject
+        # Check if user has active subscription for the subject (skip for free subjects)
         try:
-            has_subscription = SubscriptionService.has_active_subscription(user_id, subject)
-            if not has_subscription:
-                logger.warning(f"User {user_id} attempted to generate lessons for {subject} without subscription")
-                return jsonify({
-                    'success': False,
-                    'error': 'subscription_required',
-                    'message': f'Active subscription required for {subject}',
-                    'details': {
-                        'subject': subject,
-                        'user_id': user_id
-                    }
-                }), 403
+            # Check if subject is free (price is 0.00)
+            from app.api.subscriptions import AVAILABLE_SUBJECTS
+            is_free_subject = (subject in AVAILABLE_SUBJECTS and 
+                             AVAILABLE_SUBJECTS[subject].get('price_monthly', 0) == 0.00)
+            
+            if not is_free_subject:
+                has_subscription = SubscriptionService.has_active_subscription(user_id, subject)
+                if not has_subscription:
+                    logger.warning(f"User {user_id} attempted to generate lessons for {subject} without subscription")
+                    return jsonify({
+                        'success': False,
+                        'error': 'subscription_required',
+                        'message': f'Active subscription required for {subject}',
+                        'details': {
+                            'subject': subject,
+                            'user_id': user_id
+                        }
+                    }), 403
+            else:
+                logger.info(f"Allowing free access to subject {subject} for user {user_id}")
+                
         except Exception as e:
             logger.error(f"Error checking subscription for {user_id} - {subject}: {str(e)}")
             # Continue with lesson generation if subscription check fails (graceful degradation)
@@ -701,21 +737,30 @@ def get_langchain_lesson(user_id, subject, lesson_id):
         
         logger.info(f"Retrieving LangChain lesson {lesson_id} for user {user_id}, subject {subject}")
         
-        # Check if user has active subscription for the subject
+        # Check if user has active subscription for the subject (skip for free subjects)
         try:
-            has_subscription = SubscriptionService.has_active_subscription(user_id, subject)
-            if not has_subscription:
-                logger.warning(f"User {user_id} attempted to access lesson {lesson_id} for {subject} without subscription")
-                return jsonify({
-                    'success': False,
-                    'error': 'subscription_required',
-                    'message': f'Active subscription required for {subject}',
-                    'details': {
-                        'subject': subject,
-                        'user_id': user_id,
-                        'lesson_id': lesson_id
-                    }
-                }), 403
+            # Check if subject is free (price is 0.00)
+            from app.api.subscriptions import AVAILABLE_SUBJECTS
+            is_free_subject = (subject in AVAILABLE_SUBJECTS and 
+                             AVAILABLE_SUBJECTS[subject].get('price_monthly', 0) == 0.00)
+            
+            if not is_free_subject:
+                has_subscription = SubscriptionService.has_active_subscription(user_id, subject)
+                if not has_subscription:
+                    logger.warning(f"User {user_id} attempted to access lesson {lesson_id} for {subject} without subscription")
+                    return jsonify({
+                        'success': False,
+                        'error': 'subscription_required',
+                        'message': f'Active subscription required for {subject}',
+                        'details': {
+                            'subject': subject,
+                            'user_id': user_id,
+                            'lesson_id': lesson_id
+                        }
+                    }), 403
+            else:
+                logger.info(f"Allowing free access to subject {subject} for user {user_id}")
+                
         except Exception as e:
             logger.error(f"Error checking subscription for {user_id} - {subject}: {str(e)}")
             # Continue with lesson retrieval if subscription check fails (graceful degradation)

@@ -2,9 +2,25 @@
  * Survey service for handling survey-related API calls
  */
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000/api';
 
 class SurveyService {
+  /**
+   * Test API connectivity
+   * @returns {Promise<boolean>} Whether the API is reachable
+   */
+  static async testConnection() {
+    try {
+      console.log(`Testing API connection to: ${API_BASE_URL}/health`);
+      const response = await fetch(`${API_BASE_URL}/health`);
+      console.log(`Health check response: ${response.status}`);
+      return response.ok;
+    } catch (error) {
+      console.error('API connection test failed:', error);
+      return false;
+    }
+  }
+
   /**
    * Generate a new survey for a user and subject
    * @param {string} userId - The user ID
@@ -13,6 +29,9 @@ class SurveyService {
    */
   static async generateSurvey(userId, subject) {
     try {
+      console.log(`Generating survey for user: ${userId}, subject: ${subject}`);
+      console.log(`API URL: ${API_BASE_URL}/users/${userId}/subjects/${subject}/survey/generate`);
+      
       const response = await fetch(
         `${API_BASE_URL}/users/${userId}/subjects/${subject}/survey/generate`,
         {
@@ -23,11 +42,16 @@ class SurveyService {
         }
       );
 
-      const data = await response.json();
-
+      console.log(`Response status: ${response.status}`);
+      
       if (!response.ok) {
-        throw new Error(data.message || `HTTP error! status: ${response.status}`);
+        const errorText = await response.text();
+        console.error('Response error:', errorText);
+        throw new Error(`HTTP error! status: ${response.status} - ${errorText}`);
       }
+
+      const data = await response.json();
+      console.log('Survey generation response:', data);
 
       if (!data.success) {
         throw new Error(data.message || 'Failed to generate survey');
@@ -50,6 +74,9 @@ class SurveyService {
    */
   static async getSurvey(userId, subject) {
     try {
+      console.log(`Getting survey for user: ${userId}, subject: ${subject}`);
+      console.log(`API URL: ${API_BASE_URL}/users/${userId}/subjects/${subject}/survey`);
+      
       const response = await fetch(
         `${API_BASE_URL}/users/${userId}/subjects/${subject}/survey`,
         {
@@ -60,14 +87,20 @@ class SurveyService {
         }
       );
 
-      const data = await response.json();
+      console.log(`Response status: ${response.status}`);
 
       if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Response error:', errorText);
+        
         if (response.status === 404) {
           throw new Error('Survey not found. Please generate a survey first.');
         }
-        throw new Error(data.message || `HTTP error! status: ${response.status}`);
+        throw new Error(`HTTP error! status: ${response.status} - ${errorText}`);
       }
+
+      const data = await response.json();
+      console.log('Survey retrieval response:', data);
 
       if (!data.success) {
         throw new Error(data.message || 'Failed to retrieve survey');

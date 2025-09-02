@@ -40,7 +40,7 @@ class TestLangChainPipelineIntegration:
         """Complete RAG documents for integration testing"""
         return {
             'curriculum': [
-                "Create a comprehensive 10-lesson curriculum",
+                "Create a comprehensive 5-lesson curriculum",
                 "Adapt difficulty based on skill level assessment",
                 "Skip topics the learner already knows",
                 "Include clear learning progression"

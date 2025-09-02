@@ -112,11 +112,24 @@ class PipelineOrchestrator:
         logger.info(f"Starting full pipeline {pipeline_id} for user {user_id}, subject {subject}")
         
         try:
-            # Execute pipeline stages
-            self._execute_pipeline_stages(pipeline_id, survey_data)
+            # Execute pipeline stages in background (for now, we'll run synchronously but add better error handling)
+            import threading
+            
+            def run_pipeline():
+                try:
+                    self._execute_pipeline_stages(pipeline_id, survey_data)
+                except Exception as e:
+                    logger.error(f"Pipeline {pipeline_id} failed: {e}")
+                    progress.status = PipelineStatus.FAILED
+                    progress.error_message = str(e)
+                    self._notify_progress_update(pipeline_id)
+            
+            # Start pipeline in background thread
+            pipeline_thread = threading.Thread(target=run_pipeline, daemon=True)
+            pipeline_thread.start()
             
         except Exception as e:
-            logger.error(f"Pipeline {pipeline_id} failed: {e}")
+            logger.error(f"Pipeline {pipeline_id} startup failed: {e}")
             progress.status = PipelineStatus.FAILED
             progress.error_message = str(e)
             self._notify_progress_update(pipeline_id)
@@ -130,11 +143,16 @@ class PipelineOrchestrator:
         user_id = progress.user_id
         subject = progress.subject
         
+        logger.info(f"Starting pipeline execution for {pipeline_id}: user={user_id}, subject={subject}")
+        
         try:
             # Load RAG documents for all stages
+            logger.info(f"Loading RAG documents for {subject}")
             rag_docs = self._load_all_rag_documents(subject)
+            logger.info(f"RAG documents loaded: {len(rag_docs.get('curriculum', []))} curriculum, {len(rag_docs.get('lesson_plans', []))} lesson_plans, {len(rag_docs.get('content', []))} content")
             
             # Stage 1: Curriculum Generation
+            logger.info(f"Starting Stage 1: Curriculum Generation for {pipeline_id}")
             self._update_progress(
                 pipeline_id, 
                 PipelineStage.CURRICULUM_GENERATION,
@@ -142,9 +160,11 @@ class PipelineOrchestrator:
                 0.0
             )
             
+            logger.info(f"Calling curriculum generation with survey data keys: {list(survey_data.keys())}")
             curriculum_data = self.pipeline_service.generate_curriculum(
                 survey_data, subject, rag_docs.get('curriculum', [])
             )
+            logger.info(f"Curriculum generation completed for {pipeline_id}")
             
             # Save curriculum data
             UserDataService.save_curriculum_scheme(user_id, subject, curriculum_data)

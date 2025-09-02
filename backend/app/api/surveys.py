@@ -27,7 +27,19 @@ def generate_survey(user_id, subject):
         rag_docs = pipeline.survey_chain.load_rag_documents('survey', subject)
         
         # Generate the survey using LangChain
-        survey_data = pipeline.generate_survey(subject, rag_docs)
+        try:
+            survey_data = pipeline.generate_survey(subject, rag_docs)
+        except ValueError as e:
+            if "Invalid JSON" in str(e):
+                logger.error(f"JSON parsing error during survey generation: {e}")
+                return jsonify({
+                    'success': False,
+                    'error': 'generation_error',
+                    'message': 'Survey generation failed due to response formatting issues. Please try again.',
+                    'details': 'The AI response could not be parsed properly. This is usually temporary.'
+                }), 500
+            else:
+                raise e
         
         # Add user-specific metadata
         survey_data['user_id'] = user_id
@@ -251,8 +263,8 @@ def get_survey_results(user_id, subject):
             'error': 'retrieval_error',
             'message': 'Failed to retrieve survey results'
         }), 500
-def
- _validate_survey_structure(survey: dict) -> bool:
+
+def _validate_survey_structure(survey: dict) -> bool:
     """
     Validate that a LangChain-generated survey meets quality standards
     

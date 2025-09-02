@@ -64,7 +64,7 @@ class TestLessonGenerationService:
         
         # Verify lessons
         assert isinstance(lessons, list)
-        assert len(lessons) <= 10  # Should not exceed 10 lessons
+        assert len(lessons) <= 5  # Should not exceed 5 lessons
         assert len(lessons) > 0    # Should have at least some lessons
         
         # Verify each lesson structure

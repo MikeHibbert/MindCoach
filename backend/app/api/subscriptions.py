@@ -40,6 +40,12 @@ AVAILABLE_SUBJECTS = {
         'description': 'Database design and SQL queries',
         'price_monthly': 24.99,
         'price_yearly': 249.99
+    },
+    'therapy': {
+        'name': 'Therapy and Counseling',
+        'description': 'Learn therapeutic techniques and counseling skills',
+        'price_monthly': 0.00,  # Free subject for demo
+        'price_yearly': 0.00
     }
 }
 

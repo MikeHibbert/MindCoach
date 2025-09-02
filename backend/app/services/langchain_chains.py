@@ -47,14 +47,19 @@ class BaseLangChainService(ABC):
         
         for attempt in range(max_attempts):
             try:
-                logger.debug(f"Generation attempt {attempt + 1}/{max_attempts}")
+                logger.info(f"Generation attempt {attempt + 1}/{max_attempts}")
                 result = chain.run(**inputs)
-                logger.debug(f"Generation successful on attempt {attempt + 1}")
+                logger.info(f"Generation successful on attempt {attempt + 1}")
                 return result
                 
             except ValueError as e:
                 if "Invalid JSON" in str(e) and attempt < max_attempts - 1:
                     logger.warning(f"JSON parsing failed on attempt {attempt + 1}, retrying: {e}")
+                    # For JSON errors, try with slightly different temperature to get different output
+                    if hasattr(self, 'llm') and hasattr(self.llm, 'config'):
+                        original_temp = self.llm.config.temperature
+                        self.llm.config.temperature = min(1.0, original_temp + 0.1 * attempt)
+                        logger.info(f"Adjusted temperature to {self.llm.config.temperature} for retry")
                     last_error = e
                     continue
                 else:
@@ -97,6 +102,10 @@ class ContentGenerationChain(BaseLangChainService):
 
 class SurveyGenerationChain(ContentGenerationChain):
     """Chain for generating survey questions"""
+    
+    def __init__(self, temperature: float = 0.7, max_tokens: int = 4000):
+        # Use higher token limit for survey generation to prevent truncation
+        super().__init__(temperature, max_tokens)
     
     def get_prompt_template(self) -> PromptTemplate:
         return PromptTemplate(
@@ -153,6 +162,7 @@ Create questions that effectively assess {subject} knowledge across all skill le
         
         # Prepare RAG guidelines
         rag_guidelines = "\n".join(rag_docs) if rag_docs else self._get_default_survey_guidelines()
+        logger.info(f"Using RAG guidelines length: {len(rag_guidelines)} characters")
         
         chain = self.create_chain(output_parser=self.json_parser)
         
@@ -161,6 +171,7 @@ Create questions that effectively assess {subject} knowledge across all skill le
             "rag_guidelines": rag_guidelines
         }
         
+        logger.info(f"Starting survey generation with max_tokens: {self.llm.config.max_tokens}")
         result = self.generate_with_retry(chain, inputs, max_attempts=3)
         
         # Validate output structure
@@ -264,46 +275,26 @@ class CurriculumGeneratorChain(ContentGenerationChain):
         return PromptTemplate(
             input_variables=["survey_results", "subject", "skill_level", "rag_guidelines", "known_topics"],
             template="""
-You are an expert educational curriculum designer. Create a comprehensive 10-lesson learning curriculum for {subject} based on the learner's assessment results.
+Create a 5-lesson curriculum for {subject} at {skill_level} level.
 
-LEARNER ASSESSMENT:
-{survey_results}
+ASSESSMENT: {survey_results}
+KNOWN TOPICS: {known_topics}
+GUIDELINES: {rag_guidelines}
 
-SKILL LEVEL: {skill_level}
-
-CURRICULUM GUIDELINES:
-{rag_guidelines}
-
-TOPICS TO SKIP (learner already knows):
-{known_topics}
-
-REQUIREMENTS:
-1. Create exactly 10 lessons that build progressively
-2. Adapt difficulty and pacing based on the learner's skill level
-3. Skip topics the learner already demonstrated knowledge of
-4. Replace skipped beginner topics with more advanced material if skill level is higher
-5. Each lesson should take 45-60 minutes to complete
-6. Include clear learning objectives for the overall curriculum
-
-Return your response as a JSON object with this exact structure:
+Return JSON:
 {{
     "curriculum": {{
         "subject": "{subject}",
         "skill_level": "{skill_level}",
-        "total_lessons": 10,
-        "learning_objectives": [
-            "High-level learning goal 1",
-            "High-level learning goal 2",
-            "High-level learning goal 3"
-        ],
+        "total_lessons": 5,
+        "learning_objectives": ["goal1", "goal2", "goal3"],
         "topics": [
             {{
                 "lesson_id": 1,
-                "title": "Descriptive Lesson Title",
-                "topics": ["topic1", "topic2", "topic3"],
-                "prerequisites": ["previous_topic_if_any"],
+                "title": "Lesson Title",
+                "topics": ["topic1", "topic2"],
                 "difficulty": "beginner|intermediate|advanced",
-                "estimated_duration": "45-60 minutes"
+                "estimated_duration": "60 minutes"
             }}
         ]
     }},
@@ -311,7 +302,7 @@ Return your response as a JSON object with this exact structure:
     "generation_stage": "curriculum_complete"
 }}
 
-Ensure the curriculum provides a logical learning progression and covers all essential topics for {subject} at the {skill_level} level.
+Create 5 progressive lessons covering essential {subject} topics.
 """
         )
     
@@ -354,10 +345,10 @@ Ensure the curriculum provides a logical learning progression and covers all ess
         if not self.validate_output(curriculum, curriculum_keys):
             raise ValueError("Generated curriculum structure is invalid")
         
-        # Validate that we have exactly 10 lessons
+        # Validate that we have exactly 5 lessons
         topics = curriculum.get("topics", [])
-        if len(topics) != 10:
-            logger.warning(f"Expected 10 lessons, got {len(topics)}. Adjusting...")
+        if len(topics) != 5:
+            logger.warning(f"Expected 5 lessons, got {len(topics)}. Adjusting...")
             # Could implement logic to adjust lesson count here
         
         logger.info(f"Successfully generated curriculum with {len(topics)} lessons for {subject}")
@@ -413,68 +404,34 @@ class LessonPlannerChain(ContentGenerationChain):
         return PromptTemplate(
             input_variables=["curriculum_data", "subject", "skill_level", "rag_guidelines"],
             template="""
-You are an expert educational lesson planner. Create detailed lesson plans for each lesson in the provided curriculum.
+Create lesson plans for {subject} curriculum at {skill_level} level.
 
-CURRICULUM DATA:
-{curriculum_data}
+CURRICULUM: {curriculum_data}
+GUIDELINES: {rag_guidelines}
 
-SUBJECT: {subject}
-SKILL LEVEL: {skill_level}
-
-LESSON PLANNING GUIDELINES:
-{rag_guidelines}
-
-REQUIREMENTS:
-1. Create a detailed lesson plan for each lesson in the curriculum
-2. Each lesson should be structured for 60 minutes of learning
-3. Include specific learning objectives for each lesson
-4. Define clear activities and time allocations
-5. Specify assessment methods for each lesson
-6. Include materials needed and key concepts
-7. Ensure logical progression between lessons
-
-Return your response as a JSON object with this exact structure:
+Return JSON:
 {{
     "lesson_plans": [
         {{
             "lesson_id": 1,
-            "title": "Lesson Title from Curriculum",
-            "learning_objectives": [
-                "Specific, measurable objective 1",
-                "Specific, measurable objective 2",
-                "Specific, measurable objective 3"
-            ],
+            "title": "Lesson Title",
+            "learning_objectives": ["objective1", "objective2"],
             "structure": {{
                 "introduction": "5 minutes",
                 "main_content": "25 minutes",
-                "examples": "15 minutes", 
                 "exercises": "15 minutes",
                 "summary": "5 minutes"
             }},
-            "activities": [
-                "Interactive demonstration of key concepts",
-                "Guided practice with step-by-step examples",
-                "Independent coding challenges",
-                "Peer review and discussion"
-            ],
-            "assessment": "Description of how learning will be assessed (coding exercises, quizzes, projects)",
-            "materials_needed": [
-                "Code editor or IDE",
-                "Specific libraries or tools",
-                "Reference documentation"
-            ],
-            "key_concepts": [
-                "concept1",
-                "concept2", 
-                "concept3"
-            ]
+            "activities": ["activity1", "activity2"],
+            "assessment": "Assessment method",
+            "key_concepts": ["concept1", "concept2"]
         }}
     ],
     "generated_at": "2024-01-15T10:00:00Z",
     "generation_stage": "lesson_plans_complete"
 }}
 
-Create comprehensive lesson plans that will effectively teach the {subject} curriculum at the {skill_level} level.
+Create structured lesson plans for effective {subject} teaching.
 """
         )
     
@@ -571,36 +528,29 @@ class ContentGeneratorChain(ContentGenerationChain):
         return PromptTemplate(
             input_variables=["lesson_plan", "subject", "skill_level", "rag_guidelines"],
             template="""
-You are an expert educational content creator. Generate complete lesson content based on the provided lesson plan.
+Create lesson content for {subject} at {skill_level} level.
 
 LESSON PLAN:
 {lesson_plan}
 
-SUBJECT: {subject}
-SKILL LEVEL: {skill_level}
-
-CONTENT GUIDELINES:
+GUIDELINES:
 {rag_guidelines}
 
 REQUIREMENTS:
-1. Create comprehensive lesson content following the lesson plan structure
-2. Include clear explanations of all key concepts
-3. Provide exactly 2 practical code examples with detailed explanations
-4. Create 3-5 hands-on exercises of varying difficulty
-5. Include proper markdown formatting with headers, code blocks, and lists
-6. Ensure content is appropriate for the {skill_level} skill level
-7. Make content engaging and educational
+1. Write clear explanations of key concepts
+2. Include 1-2 practical examples with code
+3. Create 2-3 simple exercises
+4. Use markdown formatting
+5. Keep content focused and concise
 
-CONTENT STRUCTURE:
-- Introduction (connect to learning objectives)
-- Core Concepts (detailed explanations)
-- Code Examples (2 practical examples with explanations)
-- Hands-on Exercises (3-5 exercises with instructions)
-- Summary and Next Steps
+STRUCTURE:
+# Lesson Title
+## Key Concepts
+## Example
+## Exercises
+## Summary
 
-Return your response as properly formatted markdown content. Do not include JSON structure - just return the markdown content directly.
-
-Generate engaging, comprehensive lesson content that effectively teaches the concepts outlined in the lesson plan.
+Generate focused lesson content in markdown format.
 """
         )
     
@@ -636,10 +586,12 @@ Generate engaging, comprehensive lesson content that effectively teaches the con
             "rag_guidelines": rag_guidelines
         }
         
+        logger.info(f"Sending content generation request for lesson {lesson_id} with {len(str(inputs))} chars of input")
         result = self.generate_with_retry(chain, inputs)
         
         # Validate that we got content
         if not result or len(result.strip()) < 100:
+            logger.error(f"Generated content too short: {len(result) if result else 0} characters")
             raise ValueError("Generated content is too short or empty")
         
         # Basic content validation

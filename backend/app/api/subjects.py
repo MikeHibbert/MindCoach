@@ -43,7 +43,14 @@ AVAILABLE_SUBJECTS = {
     }
 }
 
-@subjects_bp.route('/subjects', methods=['GET'])
+@subjects_bp.route('/subjects', methods=['GET', 'POST'])
+def handle_subjects():
+    """Handle both listing subjects (GET) and adding new subjects (POST)"""
+    if request.method == 'GET':
+        return list_subjects()
+    elif request.method == 'POST':
+        return add_subject()
+
 def list_subjects():
     """List all available subjects with pricing information"""
     try:
@@ -85,6 +92,96 @@ def list_subjects():
             'error': {
                 'code': 'INTERNAL_ERROR',
                 'message': 'Failed to retrieve subjects'
+            }
+        }), 500
+
+def add_subject():
+    """Add a new subject to the available subjects list"""
+    try:
+        data = request.get_json()
+        
+        if not data:
+            return jsonify({
+                'error': {
+                    'code': 'INVALID_REQUEST',
+                    'message': 'Request body is required'
+                }
+            }), 400
+        
+        # Validate required fields
+        name = data.get('name', '').strip()
+        description = data.get('description', '').strip()
+        
+        if not name:
+            return jsonify({
+                'error': {
+                    'code': 'MISSING_NAME',
+                    'message': 'Subject name is required'
+                }
+            }), 400
+        
+        if not description:
+            return jsonify({
+                'error': {
+                    'code': 'MISSING_DESCRIPTION',
+                    'message': 'Subject description is required'
+                }
+            }), 400
+        
+        # Generate subject ID from name (lowercase, replace spaces with hyphens)
+        subject_id = name.lower().replace(' ', '-').replace('_', '-')
+        
+        # Remove any non-alphanumeric characters except hyphens
+        import re
+        subject_id = re.sub(r'[^a-z0-9-]', '', subject_id)
+        
+        # Check if subject already exists
+        if subject_id in AVAILABLE_SUBJECTS:
+            return jsonify({
+                'error': {
+                    'code': 'SUBJECT_EXISTS',
+                    'message': f'Subject with name "{name}" already exists'
+                }
+            }), 409
+        
+        # Set default pricing
+        price_monthly = data.get('price_monthly', 29.99)
+        price_yearly = data.get('price_yearly', price_monthly * 10)  # Default to 10x monthly
+        
+        # Add new subject to the available subjects
+        AVAILABLE_SUBJECTS[subject_id] = {
+            'name': name,
+            'description': description,
+            'price_monthly': price_monthly,
+            'price_yearly': price_yearly
+        }
+        
+        # Create response subject data
+        subject_data = {
+            'id': subject_id,
+            'name': name,
+            'description': description,
+            'pricing': {
+                'monthly': price_monthly,
+                'yearly': price_yearly
+            },
+            'available': True,
+            'locked': True  # Default to locked (requires subscription)
+        }
+        
+        logger.info(f"New subject added: {subject_id} - {name}")
+        
+        return jsonify({
+            'message': f'Subject "{name}" added successfully',
+            'subject': subject_data
+        }), 201
+        
+    except Exception as e:
+        logger.error(f"Error adding subject: {str(e)}")
+        return jsonify({
+            'error': {
+                'code': 'INTERNAL_ERROR',
+                'message': 'Failed to add subject'
             }
         }), 500
 

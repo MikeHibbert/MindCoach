@@ -189,7 +189,7 @@ class TestCurriculumGeneratorChain:
         
         # Check that template contains key instructions
         template_text = prompt_template.template
-        assert "10-lesson learning curriculum" in template_text
+        assert "5-lesson curriculum" in template_text
         assert "JSON object" in template_text
         assert "curriculum" in template_text
         assert "learning_objectives" in template_text
