@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
 """
 Initial database schema migration
-Creates users, subscriptions, and survey_results tables
+Creates users and survey_results tables
 """
 
 from app import create_app, db
 from app.models.user import User
-from app.models.subscription import Subscription
 from app.models.survey_result import SurveyResult
 
 def upgrade():
@@ -17,7 +16,6 @@ def upgrade():
         # Create all tables
         db.create_all()
         print("✓ Created users table")
-        print("✓ Created subscriptions table") 
         print("✓ Created survey_results table")
         print("Migration 001_initial_schema applied successfully!")
 

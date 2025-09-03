@@ -123,13 +123,11 @@ def hello_world():
 In this lesson, you learned basic concepts.
 """
     
-    @patch('app.api.lessons.SubscriptionService.has_active_subscription')
     @patch('app.api.lessons.LessonGenerationService.generate_personalized_lessons')
     @patch('app.api.lessons.LessonFileService.save_lessons')
-    def test_generate_lessons_success(self, mock_save_lessons, mock_generate_lessons, mock_has_subscription):
+    def test_generate_lessons_success(self, mock_save_lessons, mock_generate_lessons):
         """Test successful lesson generation"""
         # Mock dependencies
-        mock_has_subscription.return_value = True
         mock_generate_lessons.return_value = self.mock_generation_result
         mock_save_lessons.return_value = {
             'user_id': self.test_user_id,
@@ -157,22 +155,8 @@ In this lesson, you learned basic concepts.
         assert data['save_summary']['saved_successfully'] == 2
         
         # Verify service calls
-        mock_has_subscription.assert_called_once_with(self.test_user_id, self.test_subject)
         mock_generate_lessons.assert_called_once_with(self.test_user_id, self.test_subject)
         mock_save_lessons.assert_called_once()
-    
-    @patch('app.api.lessons.SubscriptionService.has_active_subscription')
-    def test_generate_lessons_no_subscription(self, mock_has_subscription):
-        """Test lesson generation without subscription"""
-        mock_has_subscription.return_value = False
-        
-        response = self.client.post(f'/api/users/{self.test_user_id}/subjects/{self.test_subject}/lessons/generate')
-        
-        assert response.status_code == 403
-        data = json.loads(response.data)
-        assert data['success'] is False
-        assert data['error'] == 'subscription_required'
-        assert 'subscription required' in data['message'].lower()
     
     def test_generate_lessons_invalid_user_id(self):
         """Test lesson generation with invalid user ID"""
@@ -198,11 +182,9 @@ In this lesson, you learned basic concepts.
         assert data['error'] == 'validation_error'
         assert 'invalid subject' in data['message'].lower()
     
-    @patch('app.api.lessons.SubscriptionService.has_active_subscription')
     @patch('app.api.lessons.LessonGenerationService.generate_personalized_lessons')
-    def test_generate_lessons_no_survey_results(self, mock_generate_lessons, mock_has_subscription):
+    def test_generate_lessons_no_survey_results(self, mock_generate_lessons):
         """Test lesson generation when survey results are missing"""
-        mock_has_subscription.return_value = True
         mock_generate_lessons.side_effect = FileNotFoundError("Survey results not found")
         
         response = self.client.post(f'/api/users/{self.test_user_id}/subjects/{self.test_subject}/lessons/generate')
@@ -214,11 +196,9 @@ In this lesson, you learned basic concepts.
         assert 'survey' in data['message'].lower()
         assert data['details']['required_action'] == 'complete_survey'
     
-    @patch('app.api.lessons.SubscriptionService.has_active_subscription')
     @patch('app.api.lessons.LessonFileService.list_lessons')
-    def test_list_lessons_success(self, mock_list_lessons, mock_has_subscription):
+    def test_list_lessons_success(self, mock_list_lessons):
         """Test successful lesson listing"""
-        mock_has_subscription.return_value = True
         mock_list_lessons.return_value = {
             'user_id': self.test_user_id,
             'subject': self.test_subject,

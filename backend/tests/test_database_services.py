@@ -5,10 +5,8 @@ Unit tests for database services
 import unittest
 import tempfile
 import os
-from datetime import datetime, timedelta
 from app import create_app, db
 from app.services.user_service import UserService
-from app.services.subscription_service import SubscriptionService
 from app.services.survey_result_service import SurveyResultService
 from app.services.database_service import DatabaseService
 
@@ -72,84 +70,7 @@ class TestDatabaseServices(unittest.TestCase):
         self.assertTrue(result)
         self.assertFalse(UserService.user_exists('test_user_1'))
     
-    def test_subscription_service_crud(self):
-        """Test SubscriptionService CRUD operations"""
-        # Create a user first
-        user = UserService.create_user('test_user_2', 'test2@example.com')
-        
-        # Test create subscription
-        subscription = SubscriptionService.create_subscription(
-            'test_user_2', 'python', 'active'
-        )
-        self.assertIsNotNone(subscription)
-        self.assertEqual(subscription.user_id, 'test_user_2')
-        self.assertEqual(subscription.subject, 'python')
-        self.assertEqual(subscription.status, 'active')
-        
-        # Test get subscription
-        retrieved_sub = SubscriptionService.get_subscription('test_user_2', 'python')
-        self.assertIsNotNone(retrieved_sub)
-        self.assertEqual(retrieved_sub.subject, 'python')
-        
-        # Test has active subscription
-        self.assertTrue(SubscriptionService.has_active_subscription('test_user_2', 'python'))
-        self.assertFalse(SubscriptionService.has_active_subscription('test_user_2', 'javascript'))
-        
-        # Test get user subscriptions
-        user_subs = SubscriptionService.get_user_subscriptions('test_user_2')
-        self.assertEqual(len(user_subs), 1)
-        
-        # Test get active subscriptions
-        active_subs = SubscriptionService.get_active_subscriptions('test_user_2')
-        self.assertEqual(len(active_subs), 1)
-        
-        # Test update subscription
-        updated_sub = SubscriptionService.update_subscription(
-            'test_user_2', 'python', status='cancelled'
-        )
-        self.assertIsNotNone(updated_sub)
-        self.assertEqual(updated_sub.status, 'cancelled')
-        
-        # Test cancel subscription
-        SubscriptionService.update_subscription('test_user_2', 'python', status='active')
-        cancelled_sub = SubscriptionService.cancel_subscription('test_user_2', 'python')
-        self.assertIsNotNone(cancelled_sub)
-        self.assertEqual(cancelled_sub.status, 'cancelled')
-        
-        # Test delete subscription
-        result = SubscriptionService.delete_subscription('test_user_2', 'python')
-        self.assertTrue(result)
-        
-        # Verify deletion
-        deleted_sub = SubscriptionService.get_subscription('test_user_2', 'python')
-        self.assertIsNone(deleted_sub)
-    
-    def test_subscription_expiration(self):
-        """Test subscription expiration logic"""
-        # Create user
-        UserService.create_user('test_user_3', 'test3@example.com')
-        
-        # Create expired subscription
-        expired_date = datetime.utcnow() - timedelta(days=1)
-        expired_sub = SubscriptionService.create_subscription(
-            'test_user_3', 'python', 'active', expired_date
-        )
-        
-        # Create active subscription
-        future_date = datetime.utcnow() + timedelta(days=30)
-        active_sub = SubscriptionService.create_subscription(
-            'test_user_3', 'javascript', 'active', future_date
-        )
-        
-        # Test active subscription check
-        self.assertFalse(SubscriptionService.has_active_subscription('test_user_3', 'python'))
-        self.assertTrue(SubscriptionService.has_active_subscription('test_user_3', 'javascript'))
-        
-        # Test get expired subscriptions
-        expired_subs = SubscriptionService.get_expired_subscriptions()
-        self.assertEqual(len(expired_subs), 1)
-        self.assertEqual(expired_subs[0].subject, 'python')
-    
+
     def test_survey_result_service_crud(self):
         """Test SurveyResultService CRUD operations"""
         # Create a user first

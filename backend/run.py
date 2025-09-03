@@ -6,7 +6,6 @@ load_dotenv()
 
 from app import create_app, db
 from app.models.user import User
-from app.models.subscription import Subscription
 from app.models.survey_result import SurveyResult
 
 app = create_app()

@@ -46,40 +46,6 @@ def rate_limit_check(max_requests=100, window_minutes=60):
     return decorator
 
 
-def require_subscription(f):
-    """Decorator to check if user has active subscription for subject"""
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        user_id = kwargs.get('user_id')
-        subject = kwargs.get('subject')
-        
-        if not user_id or not subject:
-            return jsonify({
-                'error': {
-                    'code': 'MISSING_PARAMETERS',
-                    'message': 'User ID and subject are required',
-                    'details': None
-                }
-            }), 400
-        
-        # Import here to avoid circular imports
-        from app.services.subscription_service import SubscriptionService
-        
-        subscription_service = SubscriptionService()
-        if not subscription_service.has_active_subscription(user_id, subject):
-            return jsonify({
-                'error': {
-                    'code': 'SUBSCRIPTION_REQUIRED',
-                    'message': 'Active subscription required for this subject',
-                    'details': {
-                        'subject': subject,
-                        'available_plans': ['monthly', 'yearly']
-                    }
-                }
-            }), 403
-        
-        return f(*args, **kwargs)
-    return decorated_function
 
 
 def log_api_request(f):

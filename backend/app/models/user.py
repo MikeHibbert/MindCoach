@@ -11,7 +11,6 @@ class User(db.Model):
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     # Relationships
-    subscriptions = db.relationship('Subscription', backref='user', lazy=True)
     survey_results = db.relationship('SurveyResult', backref='user', lazy=True)
     
     def to_dict(self):

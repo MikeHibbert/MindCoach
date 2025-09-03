@@ -40,8 +40,6 @@ def create_app(config_name=None):
     from app.api.subjects import subjects_bp
     from app.api.surveys import surveys_bp
     from app.api.lessons import lessons_bp
-    from app.api.subscriptions import subscriptions_bp
-    from app.api.payment_gate import payment_gate_bp
     from app.api.health import health_bp
     from app.api.langchain_test import langchain_test_bp
     from app.api.rag_documents import rag_docs_bp
@@ -50,8 +48,6 @@ def create_app(config_name=None):
     app.register_blueprint(subjects_bp, url_prefix='/api')
     app.register_blueprint(surveys_bp, url_prefix='/api')
     app.register_blueprint(lessons_bp, url_prefix='/api')
-    app.register_blueprint(subscriptions_bp, url_prefix='/api')
-    app.register_blueprint(payment_gate_bp, url_prefix='/api')
     app.register_blueprint(health_bp, url_prefix='/api')
     app.register_blueprint(langchain_test_bp, url_prefix='/api')
     app.register_blueprint(rag_docs_bp, url_prefix='/api')

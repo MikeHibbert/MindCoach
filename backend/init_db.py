@@ -5,7 +5,6 @@ Database initialization script for the Personalized Learning Path Generator
 
 from app import create_app, db
 from app.models.user import User
-from app.models.subscription import Subscription
 from app.models.survey_result import SurveyResult
 
 def init_database():
@@ -20,7 +19,6 @@ def init_database():
         # Print table information
         print("\nCreated tables:")
         print("- users")
-        print("- subscriptions") 
         print("- survey_results")
         
         print("\nDatabase initialization complete!")

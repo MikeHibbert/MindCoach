@@ -3,7 +3,6 @@ import logging
 
 from app.services.lesson_generation_service import LessonGenerationService
 from app.services.lesson_file_service import LessonFileService
-from app.services.subscription_service import SubscriptionService
 from app.services.pipeline_orchestrator import get_pipeline_orchestrator
 from app.services.user_data_service import UserDataService
 from app.utils.validation import validate_user_id, validate_subject
@@ -33,32 +32,8 @@ def generate_lessons(user_id, subject):
         
         logger.info(f"Generating lessons for user {user_id}, subject {subject}")
         
-        # Check if user has active subscription for the subject (skip for free subjects)
-        try:
-            # Check if subject is free (price is 0.00)
-            from app.api.subscriptions import AVAILABLE_SUBJECTS
-            is_free_subject = (subject in AVAILABLE_SUBJECTS and 
-                             AVAILABLE_SUBJECTS[subject].get('price_monthly', 0) == 0.00)
-            
-            if not is_free_subject:
-                has_subscription = SubscriptionService.has_active_subscription(user_id, subject)
-                if not has_subscription:
-                    logger.warning(f"User {user_id} attempted to generate lessons for {subject} without subscription")
-                    return jsonify({
-                        'success': False,
-                        'error': 'subscription_required',
-                        'message': f'Active subscription required for {subject}',
-                        'details': {
-                            'subject': subject,
-                            'user_id': user_id
-                        }
-                    }), 403
-            else:
-                logger.info(f"Allowing free access to subject {subject} for user {user_id}")
-                
-        except Exception as e:
-            logger.error(f"Error checking subscription for {user_id} - {subject}: {str(e)}")
-            # Continue with lesson generation if subscription check fails (graceful degradation)
+        # Subscription check removed - all subjects are now free
+        logger.info(f"Allowing free access to subject {subject} for user {user_id}")
         
         # Generate personalized lessons
         generation_result = LessonGenerationService.generate_personalized_lessons(user_id, subject)
@@ -144,32 +119,8 @@ def list_lessons(user_id, subject):
         
         logger.info(f"Listing lessons for user {user_id}, subject {subject}")
         
-        # Check if user has active subscription for the subject (skip for free subjects)
-        try:
-            # Check if subject is free (price is 0.00)
-            from app.api.subscriptions import AVAILABLE_SUBJECTS
-            is_free_subject = (subject in AVAILABLE_SUBJECTS and 
-                             AVAILABLE_SUBJECTS[subject].get('price_monthly', 0) == 0.00)
-            
-            if not is_free_subject:
-                has_subscription = SubscriptionService.has_active_subscription(user_id, subject)
-                if not has_subscription:
-                    logger.warning(f"User {user_id} attempted to access lessons for {subject} without subscription")
-                    return jsonify({
-                        'success': False,
-                        'error': 'subscription_required',
-                        'message': f'Active subscription required for {subject}',
-                        'details': {
-                            'subject': subject,
-                            'user_id': user_id
-                        }
-                    }), 403
-            else:
-                logger.info(f"Allowing free access to subject {subject} for user {user_id}")
-                
-        except Exception as e:
-            logger.error(f"Error checking subscription for {user_id} - {subject}: {str(e)}")
-            # Continue with lesson listing if subscription check fails (graceful degradation)
+        # Subscription check removed - all subjects are now free
+        logger.info(f"Allowing free access to subject {subject} for user {user_id}")
         
         # Get lesson list
         lesson_list = LessonFileService.list_lessons(user_id, subject)
@@ -187,7 +138,6 @@ def list_lessons(user_id, subject):
                 'generated_at': lesson_list.get('generated_at')
             }
         }), 200
-        
     except ValueError as e:
         logger.warning(f"Validation error listing lessons: {str(e)}")
         return jsonify({
@@ -195,7 +145,6 @@ def list_lessons(user_id, subject):
             'error': 'validation_error',
             'message': str(e)
         }), 400
-        
     except Exception as e:
         logger.error(f"Error listing lessons for {user_id} - {subject}: {str(e)}")
         return jsonify({
@@ -206,52 +155,24 @@ def list_lessons(user_id, subject):
 
 @lessons_bp.route('/users/<user_id>/subjects/<subject>/lessons/<int:lesson_number>', methods=['GET'])
 def get_lesson(user_id, subject, lesson_number):
-    """Retrieve a specific lesson by number"""
+    """Get a specific lesson"""
     try:
-        # Validate input parameters
+        # Validate inputs
         if not validate_user_id(user_id):
             return jsonify({
-                'success': False,
-                'error': 'validation_error',
-                'message': 'Invalid user ID format'
+                'error': {
+                    'code': 'INVALID_USER_ID',
+                    'message': 'Invalid user ID format'
+                }
             }), 400
         
         if not validate_subject(subject):
             return jsonify({
-                'success': False,
-                'error': 'validation_error',
-                'message': 'Invalid subject format'
+                'error': {
+                    'code': 'INVALID_SUBJECT',
+                    'message': 'Invalid subject format'
+                }
             }), 400
-        
-        logger.info(f"Retrieving lesson {lesson_number} for user {user_id}, subject {subject}")
-        
-        # Check if user has active subscription for the subject (skip for free subjects)
-        try:
-            # Check if subject is free (price is 0.00)
-            from app.api.subscriptions import AVAILABLE_SUBJECTS
-            is_free_subject = (subject in AVAILABLE_SUBJECTS and 
-                             AVAILABLE_SUBJECTS[subject].get('price_monthly', 0) == 0.00)
-            
-            if not is_free_subject:
-                has_subscription = SubscriptionService.has_active_subscription(user_id, subject)
-                if not has_subscription:
-                    logger.warning(f"User {user_id} attempted to access lesson {lesson_number} for {subject} without subscription")
-                    return jsonify({
-                        'success': False,
-                        'error': 'subscription_required',
-                        'message': f'Active subscription required for {subject}',
-                        'details': {
-                            'subject': subject,
-                            'user_id': user_id,
-                            'lesson_number': lesson_number
-                        }
-                    }), 403
-            else:
-                logger.info(f"Allowing free access to subject {subject} for user {user_id}")
-                
-        except Exception as e:
-            logger.error(f"Error checking subscription for {user_id} - {subject}: {str(e)}")
-            # Continue with lesson retrieval if subscription check fails (graceful degradation)
         
         # Get the specific lesson
         lesson = LessonFileService.get_lesson(user_id, subject, lesson_number)
@@ -267,7 +188,7 @@ def get_lesson(user_id, subject, lesson_number):
                 'difficulty': lesson['difficulty'],
                 'topics': lesson['topics'],
                 'content': lesson['content'],
-                'loaded_at': lesson['loaded_at']
+                'exercises': lesson.get('exercises', [])
             }
         }), 200
         
@@ -278,19 +199,6 @@ def get_lesson(user_id, subject, lesson_number):
             'error': 'validation_error',
             'message': str(e)
         }), 400
-        
-    except FileNotFoundError as e:
-        logger.info(f"Lesson not found: {str(e)}")
-        return jsonify({
-            'success': False,
-            'error': 'not_found',
-            'message': f'Lesson {lesson_number} not found for {subject}',
-            'details': {
-                'lesson_number': lesson_number,
-                'subject': subject,
-                'user_id': user_id
-            }
-        }), 404
         
     except Exception as e:
         logger.error(f"Error retrieving lesson {lesson_number} for {user_id} - {subject}: {str(e)}")
@@ -450,73 +358,27 @@ def generate_lessons_langchain(user_id, subject):
         
         logger.info(f"Starting LangChain lesson generation for user {user_id}, subject {subject}")
         
-        # Check if user has active subscription for the subject (skip for free subjects)
-        try:
-            # Check if subject is free (price is 0.00)
-            from app.api.subscriptions import AVAILABLE_SUBJECTS
-            is_free_subject = (subject in AVAILABLE_SUBJECTS and 
-                             AVAILABLE_SUBJECTS[subject].get('price_monthly', 0) == 0.00)
-            
-            if not is_free_subject:
-                has_subscription = SubscriptionService.has_active_subscription(user_id, subject)
-                if not has_subscription:
-                    logger.warning(f"User {user_id} attempted to generate lessons for {subject} without subscription")
-                    return jsonify({
-                        'success': False,
-                        'error': 'subscription_required',
-                        'message': f'Active subscription required for {subject}',
-                        'details': {
-                            'subject': subject,
-                            'user_id': user_id
-                        }
-                    }), 403
-            else:
-                logger.info(f"Allowing free access to subject {subject} for user {user_id}")
-                
-        except Exception as e:
-            logger.error(f"Error checking subscription for {user_id} - {subject}: {str(e)}")
-            # Continue with lesson generation if subscription check fails (graceful degradation)
-        
         # Load survey data
         survey_data = UserDataService.load_survey_answers(user_id, subject)
         if not survey_data:
-            logger.warning(f"Survey results not found for {user_id} - {subject}")
             return jsonify({
                 'success': False,
-                'error': 'prerequisite_missing',
-                'message': 'Survey results not found. Please complete the subject survey first.',
-                'details': {
-                    'required_action': 'complete_survey',
-                    'subject': subject
-                }
-            }), 404
+                'error': 'survey_required',
+                'message': 'Please complete the survey before generating lessons'
+            }), 400
         
-        # Start the LangChain pipeline
+        # Start pipeline
         orchestrator = get_pipeline_orchestrator()
-        pipeline_id = orchestrator.start_full_pipeline(
-            user_id=user_id,
-            subject=subject,
-            survey_data=survey_data
-        )
-        
-        logger.info(f"LangChain pipeline started for {user_id} - {subject}: {pipeline_id}")
+        pipeline_id = orchestrator.start_full_pipeline(user_id, subject, survey_data)
         
         return jsonify({
             'success': True,
             'pipeline_id': pipeline_id,
-            'message': f'LangChain lesson generation started for {subject}',
-            'generation_method': 'langchain',
-            'status': 'started',
-            'details': {
-                'user_id': user_id,
-                'subject': subject,
-                'skill_level': survey_data.get('skill_level', 'unknown'),
-                'total_stages': 3
-            }
-        }), 202
+            'message': 'Content generation pipeline started'
+        }), 200
         
     except ValueError as e:
-        logger.warning(f"Validation error starting LangChain generation: {str(e)}")
+        logger.warning(f"Validation error starting pipeline: {str(e)}")
         return jsonify({
             'success': False,
             'error': 'validation_error',
@@ -524,11 +386,11 @@ def generate_lessons_langchain(user_id, subject):
         }), 400
         
     except Exception as e:
-        logger.error(f"Error starting LangChain generation for {user_id} - {subject}: {str(e)}")
+        logger.error(f"Error starting pipeline for {user_id} - {subject}: {str(e)}")
         return jsonify({
             'success': False,
-            'error': 'generation_error',
-            'message': 'Failed to start LangChain lesson generation'
+            'error': 'pipeline_error',
+            'message': 'Failed to start content generation pipeline'
         }), 500
 
 @lessons_bp.route('/users/<user_id>/subjects/<subject>/lessons/pipeline-status/<pipeline_id>', methods=['GET'])
@@ -718,52 +580,24 @@ def get_lesson_plans(user_id, subject):
 
 @lessons_bp.route('/users/<user_id>/subjects/<subject>/lessons/<int:lesson_id>/langchain', methods=['GET'])
 def get_langchain_lesson(user_id, subject, lesson_id):
-    """Retrieve a specific lesson generated by LangChain"""
+    """Get a LangChain-generated lesson"""
     try:
-        # Validate input parameters
+        # Validate inputs
         if not validate_user_id(user_id):
             return jsonify({
-                'success': False,
-                'error': 'validation_error',
-                'message': 'Invalid user ID format'
+                'error': {
+                    'code': 'INVALID_USER_ID',
+                    'message': 'Invalid user ID format'
+                }
             }), 400
         
         if not validate_subject(subject):
             return jsonify({
-                'success': False,
-                'error': 'validation_error',
-                'message': 'Invalid subject format'
+                'error': {
+                    'code': 'INVALID_SUBJECT',
+                    'message': 'Invalid subject format'
+                }
             }), 400
-        
-        logger.info(f"Retrieving LangChain lesson {lesson_id} for user {user_id}, subject {subject}")
-        
-        # Check if user has active subscription for the subject (skip for free subjects)
-        try:
-            # Check if subject is free (price is 0.00)
-            from app.api.subscriptions import AVAILABLE_SUBJECTS
-            is_free_subject = (subject in AVAILABLE_SUBJECTS and 
-                             AVAILABLE_SUBJECTS[subject].get('price_monthly', 0) == 0.00)
-            
-            if not is_free_subject:
-                has_subscription = SubscriptionService.has_active_subscription(user_id, subject)
-                if not has_subscription:
-                    logger.warning(f"User {user_id} attempted to access lesson {lesson_id} for {subject} without subscription")
-                    return jsonify({
-                        'success': False,
-                        'error': 'subscription_required',
-                        'message': f'Active subscription required for {subject}',
-                        'details': {
-                            'subject': subject,
-                            'user_id': user_id,
-                            'lesson_id': lesson_id
-                        }
-                    }), 403
-            else:
-                logger.info(f"Allowing free access to subject {subject} for user {user_id}")
-                
-        except Exception as e:
-            logger.error(f"Error checking subscription for {user_id} - {subject}: {str(e)}")
-            # Continue with lesson retrieval if subscription check fails (graceful degradation)
         
         # Load lesson content
         lesson_content = UserDataService.load_lesson_content(user_id, subject, lesson_id)
@@ -781,40 +615,9 @@ def get_langchain_lesson(user_id, subject, lesson_id):
                 }
             }), 404
         
-        # Parse metadata from content if present
-        metadata = {}
-        content_lines = lesson_content.split('\n')
-        if content_lines[0].strip() == '---':
-            # Find end of metadata
-            metadata_end = -1
-            for i, line in enumerate(content_lines[1:], 1):
-                if line.strip() == '---':
-                    metadata_end = i
-                    break
-            
-            if metadata_end > 0:
-                # Parse metadata
-                for line in content_lines[1:metadata_end]:
-                    if ':' in line:
-                        key, value = line.split(':', 1)
-                        metadata[key.strip()] = value.strip()
-                
-                # Remove metadata from content
-                lesson_content = '\n'.join(content_lines[metadata_end + 1:]).strip()
-        
-        logger.info(f"LangChain lesson {lesson_id} retrieved for {user_id} - {subject}")
-        
         return jsonify({
             'success': True,
-            'lesson': {
-                'lesson_id': lesson_id,
-                'user_id': user_id,
-                'subject': subject,
-                'content': lesson_content,
-                'metadata': metadata,
-                'generation_method': 'langchain',
-                'retrieved_at': metadata.get('generated_at', 'unknown')
-            }
+            'lesson': lesson_content
         }), 200
         
     except ValueError as e:
