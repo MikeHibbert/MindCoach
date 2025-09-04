@@ -7,7 +7,6 @@ MindCoach is an intelligent web application that creates customized learning exp
 ### Core Functionality
 - **AI-Powered Assessments**: Dynamic survey generation using Grok-3 Mini via xAI API
 - **Personalized Content**: Three-stage LangChain pipeline for curriculum, lesson planning, and content generation
-- **Pay-per-Subject Model**: Subscription-based access to individual programming subjects
 - **Responsive Design**: Optimized for desktop (1024px+), tablet (768px+), and mobile (767px-) devices
 - **Accessibility Compliant**: WCAG 2.1 AA standards with full keyboard navigation and screen reader support
 

@@ -102,6 +102,7 @@ const PipelineProgressTracker = ({
   };
 
   const handlePipelineError = (err) => {
+    // Remove subscription-related error handling
     console.error('Pipeline error:', err);
     setError(err);
     setPipelineStatus(null);

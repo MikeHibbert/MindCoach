@@ -27,10 +27,10 @@ class XAILLMConfig(BaseModel):
     api_url: str = Field(default="https://api.x.ai/v1", description="xAI API base URL")
     model: str = Field(default="grok-3-mini", description="Model name")
     temperature: float = Field(default=0.7, description="Temperature for generation")
-    max_tokens: int = Field(default=2000, description="Maximum tokens to generate")
-    timeout: int = Field(default=45, description="Request timeout in seconds")
-    max_retries: int = Field(default=3, description="Maximum number of retries")
-    retry_delay: float = Field(default=1.0, description="Delay between retries in seconds")
+    max_tokens: int = Field(default=2500, description="Maximum tokens to generate")
+    timeout: int = Field(default=90, description="Request timeout in seconds")
+    max_retries: int = Field(default=5, description="Maximum number of retries")
+    retry_delay: float = Field(default=2.0, description="Delay between retries in seconds")
 
 class XAILLM(LLM):
     """Custom LangChain LLM for xAI API integration"""

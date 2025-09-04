@@ -9,7 +9,6 @@ const SubjectSelector = React.lazy(() => import('./components/SubjectSelector'))
 const SurveyContainer = React.lazy(() => import('./components/SurveyContainer'));
 const SurveyResults = React.lazy(() => import('./components/SurveyResults'));
 const LessonViewer = React.lazy(() => import('./components/LessonViewer'));
-const PaymentGate = React.lazy(() => import('./components/PaymentGate'));
 const RAGDocumentManager = React.lazy(() => import('./components/RAGDocumentManager'));
 const ErrorBoundary = React.lazy(() => import('./components/ErrorBoundary'));
 
@@ -39,7 +38,6 @@ function App() {
               <Route path="/users/:userId/subjects/:subject/results" element={<SurveyResults />} />
               <Route path="/users/:userId/subjects/:subject/lessons" element={<LessonViewer />} />
               <Route path="/users/:userId/subjects/:subject/lessons/:lessonId" element={<LessonViewer />} />
-              <Route path="/payment/:subject" element={<PaymentGate />} />
               <Route path="/admin/rag-documents" element={<RAGDocumentManager />} />
             </Routes>
           </Suspense>

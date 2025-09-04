@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
 import LessonService from '../services/lessonService';
 import PipelineService from '../services/pipelineService';
 import PipelineProgressTracker from './PipelineProgressTracker';
+import SurveyService from '../services/surveyService';
 import { 
   announceToScreenReader, 
   keyboardNavigation, 
@@ -16,6 +17,8 @@ import {
 const LessonViewer = ({ userId: propUserId, subject: propSubject, initialLessonNumber = 1 }) => {
   // Extract URL parameters
   const { userId: urlUserId, subject: urlSubject, lessonId } = useParams();
+  const navigate = useNavigate();
+  const location = useLocation();
   
   // Use URL parameters if available, otherwise use props (for backward compatibility)
   const userId = urlUserId || propUserId || 'anonymous';
@@ -49,13 +52,13 @@ const LessonViewer = ({ userId: propUserId, subject: propSubject, initialLessonN
   // Load lesson list and progress on component mount
   useEffect(() => {
     console.log('LessonViewer mounted with:', { userId, subject, urlUserId, urlSubject });
+    
     if (userId && subject) {
-      loadLessonList();
-      loadProgress();
-      loadCompletionStatus();
+      // Always trigger content generation for new subjects
+      setNeedsGeneration(true);
       loadLangChainData();
     }
-  }, [userId, subject]);
+  }, [userId, subject, location.search]);
 
   // Load specific lesson when lesson number changes
   useEffect(() => {
@@ -121,14 +124,67 @@ const LessonViewer = ({ userId: propUserId, subject: propSubject, initialLessonN
       console.debug('No lesson plans found:', err.message);
     }
 
-    // Check if lessons exist, if not, show generation option
+    // Check if lessons exist and if regeneration is needed due to survey retake
     try {
       const lessonListResponse = await LessonService.listLessons(userId, subject);
       if (!lessonListResponse.success || !lessonListResponse.lessons || lessonListResponse.lessons.length === 0) {
         setNeedsGeneration(true);
+      } else {
+        // Check if survey was retaken after lesson generation
+        await checkSurveyRetakeStatus(lessonListResponse);
       }
     } catch (err) {
       setNeedsGeneration(true);
+    }
+  };
+
+  const checkSurveyRetakeStatus = async (lessonListResponse) => {
+    try {
+      // Get survey results to compare timestamps
+      const effectiveUserId = userId === 'anonymous' ? 'anonymous' : userId;
+      const surveyResults = await SurveyService.getSurveyResults(effectiveUserId, subject);
+      
+      let regenerationNeeded = false;
+      
+      if (surveyResults && surveyResults.processed_at && lessonListResponse.generated_at) {
+        const surveyDate = new Date(surveyResults.processed_at);
+        const lessonDate = new Date(lessonListResponse.generated_at);
+        
+        console.log('LessonViewer timestamp comparison:', {
+          surveyProcessedAt: surveyResults.processed_at,
+          lessonsGeneratedAt: lessonListResponse.generated_at,
+          surveyDate,
+          lessonDate,
+          needsRegeneration: surveyDate > lessonDate
+        });
+        
+        // If survey was processed after lessons were generated, trigger regeneration
+        if (surveyDate > lessonDate) {
+          console.log('Survey retaken after lesson generation - triggering regeneration');
+          regenerationNeeded = true;
+        }
+      }
+      
+      // Additional check: if subject is "therapy" but lessons seem to be about programming
+      if (subject.toLowerCase() === 'therapy' && lessonListResponse.lessons && lessonListResponse.lessons.length > 0) {
+        const firstLessonTitle = lessonListResponse.lessons[0]?.title?.toLowerCase() || '';
+        const firstLessonContent = lessonListResponse.lessons[0]?.content?.toLowerCase() || '';
+        
+        // Check if content seems to be about programming instead of therapy
+        if (firstLessonTitle.includes('python') || firstLessonTitle.includes('programming') || 
+            firstLessonContent.includes('import ') || firstLessonContent.includes('def ') ||
+            firstLessonContent.includes('class ') || firstLessonContent.includes('module')) {
+          console.log('Detected programming content for therapy subject - triggering regeneration');
+          regenerationNeeded = true;
+        }
+      }
+      
+      if (regenerationNeeded) {
+        setNeedsGeneration(true);
+      }
+    } catch (err) {
+      console.debug('Could not check survey retake status:', err.message);
+      // Don't trigger regeneration if we can't determine the status
     }
   };
 
@@ -585,6 +641,30 @@ const LessonViewer = ({ userId: propUserId, subject: propSubject, initialLessonN
           )}
         </div>
       )}
+
+      {/* Retake Survey Button */}
+      <div className="mb-4">
+        <button
+          onClick={() => {
+            const surveyPath = userId && userId !== 'anonymous' 
+              ? `/users/${userId}/subjects/${subject}/survey`
+              : `/subjects/${subject}/survey`;
+            navigate(surveyPath);
+          }}
+          className="w-full text-left p-3 bg-orange-50 border border-orange-200 rounded-lg hover:bg-orange-100 transition-colors focus:outline-none focus:ring-2 focus:ring-orange-500"
+          aria-label="Retake survey to update your learning preferences"
+        >
+          <div className="flex items-center">
+            <svg className="w-5 h-5 text-orange-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            <div>
+              <div className="font-medium text-orange-900">Retake Survey</div>
+              <div className="text-xs text-orange-700">Update your learning preferences</div>
+            </div>
+          </div>
+        </button>
+      </div>
       
       {progress && (
         <div className="mb-6">

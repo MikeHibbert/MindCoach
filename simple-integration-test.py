@@ -329,14 +329,6 @@ class SimpleIntegrationTester:
         if user_data["user"]["user_id"] != self.test_user_id:
             raise Exception("User data corrupted")
         
-        # Verify subscription persists
-        response = requests.get(f"{self.backend_url}/api/users/{self.test_user_id}/subjects/{self.test_subject}/status")
-        if response.status_code != 200:
-            raise Exception("Subscription data not persisted")
-        
-        status_data = response.json()
-        if not status_data.get("access_status", {}).get("has_active_subscription"):
-            raise Exception("Subscription status not persisted")
         
         # Check if user directory was created
         user_dir = Path(f"backend/users/{self.test_user_id}")

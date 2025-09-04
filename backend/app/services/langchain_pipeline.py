@@ -25,7 +25,7 @@ class LangChainPipelineService:
             self.survey_chain = SurveyGenerationChain(temperature=0.8, max_tokens=2500)
             self.curriculum_chain = CurriculumGeneratorChain(temperature=0.7, max_tokens=2500)
             self.lesson_planner_chain = LessonPlannerChain(temperature=0.7, max_tokens=2500)
-            self.content_generator_chain = ContentGeneratorChain(temperature=0.6, max_tokens=2500)
+            self.content_generator_chain = ContentGeneratorChain(temperature=0.7, max_tokens=3000)
             self.mock_mode = False
             logger.info("LangChain pipeline service initialized with API")
         else:

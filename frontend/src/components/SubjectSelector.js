@@ -47,16 +47,74 @@ const SubjectSelector = ({ onSubjectSelect }) => {
     fetchSubjects();
   }, [fetchSubjects]);
 
-  const handleSubjectSelect = (subject) => {
+  const handleSubjectSelect = async (subject) => {
     setSelectedSubject(subject);
+    setLoading(true);
     
-    if (user) {
-      // Navigate to survey for authenticated users
-      navigate(`/users/${user.user_id}/subjects/${subject.id}/survey`);
-    } else {
-      // Navigate to survey for anonymous users
-      navigate(`/subjects/${subject.id}/survey`);
+    // Determine user ID for API calls
+    const effectiveUserId = user ? user.user_id : 'anonymous';
+    
+    try {
+      // Check if lessons already exist for this subject
+      const lessonsResponse = user 
+        ? await authenticatedFetch(`${API_BASE_URL}/users/${effectiveUserId}/subjects/${subject.id}/lessons`)
+        : await fetch(`${API_BASE_URL}/users/${effectiveUserId}/subjects/${subject.id}/lessons`);
+      
+      if (lessonsResponse.ok) {
+        const lessonsData = await lessonsResponse.json();
+        
+        // If lessons exist and there are actual lessons available, go to lessons
+        if (lessonsData.success && lessonsData.lessons && lessonsData.lessons.length > 0) {
+          const lessonsPath = user 
+            ? `/users/${user.user_id}/subjects/${subject.id}/lessons`
+            : `/subjects/${subject.id}/lessons`;
+          
+          console.log('Lessons found, navigating to:', lessonsPath);
+          navigate(lessonsPath);
+          
+          if (onSubjectSelect) {
+            onSubjectSelect(subject);
+          }
+          return;
+        }
+      }
+      
+      // Check if survey results exist
+      const surveyResponse = user 
+        ? await authenticatedFetch(`${API_BASE_URL}/users/${effectiveUserId}/subjects/${subject.id}/survey/results`)
+        : await fetch(`${API_BASE_URL}/users/${effectiveUserId}/subjects/${subject.id}/survey/results`);
+      
+      if (surveyResponse.ok) {
+        const surveyData = await surveyResponse.json();
+        
+        // If survey results exist, go to results page
+        if (surveyData.success && surveyData.results) {
+          const resultsPath = user 
+            ? `/users/${user.user_id}/subjects/${subject.id}/results`
+            : `/subjects/${subject.id}/results`;
+          
+          console.log('Survey results found, navigating to:', resultsPath);
+          navigate(resultsPath);
+          
+          if (onSubjectSelect) {
+            onSubjectSelect(subject);
+          }
+          return;
+        }
+      }
+    } catch (error) {
+      console.log('Error checking existing data, proceeding to survey:', error);
+    } finally {
+      setLoading(false);
     }
+    
+    // Default: Navigate to survey (first time or if checks failed)
+    const surveyPath = user 
+      ? `/users/${user.user_id}/subjects/${subject.id}/survey`
+      : `/subjects/${subject.id}/survey`;
+    
+    console.log('No existing data found, navigating to survey:', surveyPath);
+    navigate(surveyPath);
     
     if (onSubjectSelect) {
       onSubjectSelect(subject);
@@ -121,6 +179,7 @@ const SubjectSelector = ({ onSubjectSelect }) => {
         tabIndex={0}
         role="button"
         aria-pressed={isSelected}
+        data-testid={`subject-card-${subject.id}`}
       >
         {/* Selection indicator */}
         {isSelected && (
@@ -148,14 +207,6 @@ const SubjectSelector = ({ onSubjectSelect }) => {
         <p className="text-sm mb-4 text-gray-700">
           {subject.description}
         </p>
-        
-        <div className="flex items-center justify-between">
-          <div className="text-sm">
-            <span className="font-medium text-blue-700">
-              Available
-            </span>
-          </div>
-        </div>
       </div>
     );
   };

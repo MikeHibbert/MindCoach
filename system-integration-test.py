@@ -85,29 +85,7 @@ class SystemIntegrationTester:
         test_file.unlink()
         self.log("   File system operations successful")
         
-    def test_subscription_workflow(self):
-        """Test complete subscription workflow"""
-        # Purchase subscription
-        subscription_data = {"plan": "monthly"}
-        response = requests.post(
-            f"{self.backend_url}/api/users/{self.test_user_id}/subscriptions/{self.test_subject}",
-            json=subscription_data
-        )
-        if response.status_code != 201:
-            raise Exception(f"Subscription purchase failed: {response.status_code}")
-            
-        # Verify subscription status
-        response = requests.get(
-            f"{self.backend_url}/api/users/{self.test_user_id}/subjects/{self.test_subject}/status"
-        )
-        if response.status_code != 200:
-            raise Exception(f"Subscription status check failed: {response.status_code}")
-            
-        status_data = response.json()
-        if not status_data.get("access_status", {}).get("has_active_subscription"):
-            raise Exception("Subscription not active after purchase")
-            
-        self.log("   Subscription workflow successful")
+
         
     def test_subject_selection_workflow(self):
         """Test subject selection workflow"""

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import SurveyService from '../services/surveyService';
+import LessonService from '../services/lessonService';
 
 const SurveyResults = () => {
   const { userId, subject } = useParams();
@@ -12,6 +13,8 @@ const SurveyResults = () => {
   const [results, setResults] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [lessonInfo, setLessonInfo] = useState(null);
+  const [needsRegeneration, setNeedsRegeneration] = useState(false);
 
   // Get results from navigation state or fetch from API
   useEffect(() => {
@@ -39,12 +42,80 @@ const SurveyResults = () => {
         const apiResults = await SurveyService.getSurveyResults(effectiveUserId, subject);
         setResults(apiResults);
         
+        // Check if lessons exist and compare timestamps
+        await checkLessonStatus(effectiveUserId, subject, apiResults);
+        
       } catch (err) {
         console.error('Error loading survey results:', err);
         setError(err.message);
       } finally {
         setLoading(false);
       }
+    };
+
+    const checkLessonStatus = async (effectiveUserId, subject, surveyResults) => {
+      try {
+        // Try to get lesson information
+        const lessonResponse = await LessonService.listLessons(effectiveUserId, subject);
+        
+        if (lessonResponse.success && lessonResponse.lessons && lessonResponse.lessons.length > 0) {
+          setLessonInfo(lessonResponse);
+          
+          // Compare timestamps if both are available
+          const surveyProcessedAt = surveyResults?.processed_at;
+          const lessonsGeneratedAt = lessonResponse?.generated_at;
+          
+          console.log('Timestamp comparison:', {
+            surveyProcessedAt,
+            lessonsGeneratedAt,
+            surveyDate: surveyProcessedAt ? new Date(surveyProcessedAt) : null,
+            lessonDate: lessonsGeneratedAt ? new Date(lessonsGeneratedAt) : null
+          });
+          
+          let regenerationNeeded = false;
+          
+          if (surveyProcessedAt && lessonsGeneratedAt) {
+            const surveyDate = new Date(surveyProcessedAt);
+            const lessonDate = new Date(lessonsGeneratedAt);
+            
+            // If survey was processed after lessons were generated, suggest regeneration
+            if (surveyDate > lessonDate) {
+              console.log('Survey retaken after lesson generation - suggesting regeneration');
+              regenerationNeeded = true;
+            } else {
+              console.log('Survey is older than lessons - checking content relevance');
+            }
+          } else {
+            console.log('Missing timestamp data - checking content relevance as fallback');
+          }
+          
+          // Additional check: if subject is "therapy" but lessons seem to be about programming
+          if (subject.toLowerCase() === 'therapy' && lessonResponse.lessons.length > 0) {
+            const firstLessonTitle = lessonResponse.lessons[0]?.title?.toLowerCase() || '';
+            const firstLessonContent = lessonResponse.lessons[0]?.content?.toLowerCase() || '';
+            
+            // Check if content seems to be about programming instead of therapy
+            if (firstLessonTitle.includes('python') || firstLessonTitle.includes('programming') || 
+                firstLessonContent.includes('import ') || firstLessonContent.includes('def ') ||
+                firstLessonContent.includes('class ') || firstLessonContent.includes('module')) {
+              console.log('Detected programming content for therapy subject - suggesting regeneration');
+              regenerationNeeded = true;
+            }
+          }
+          
+          setNeedsRegeneration(regenerationNeeded);
+        }
+      } catch (err) {
+        console.log('No existing lessons found or error checking lesson status:', err.message);
+        // This is expected if no lessons exist yet
+      }
+      
+      // Debug logging
+      console.log('Final state after checkLessonStatus:', {
+        lessonInfo,
+        needsRegeneration,
+        hasLessons: lessonInfo?.lessons?.length > 0
+      });
     };
 
     if (subject) {
@@ -56,11 +127,27 @@ const SurveyResults = () => {
   }, [userId, subject, location.state]);
 
   const handleStartLearning = () => {
-    // Determine the correct path based on current route structure
-    const effectiveUserId = userId || 'anonymous';
-    const lessonsPath = `/users/${effectiveUserId}/subjects/${subject}/lessons`;
+    if (needsRegeneration) {
+      // Show regeneration confirmation
+      handleRegenerateContent();
+    } else {
+      // Use clean URLs for anonymous users, user-specific URLs for authenticated users
+      const lessonsPath = userId 
+        ? `/users/${userId}/subjects/${subject}/lessons`
+        : `/subjects/${subject}/lessons`;
+      
+      console.log('Navigating to lessons:', lessonsPath);
+      navigate(lessonsPath);
+    }
+  };
+
+  const handleRegenerateContent = () => {
+    // Navigate to lessons page which will detect the need for regeneration
+    const lessonsPath = userId 
+      ? `/users/${userId}/subjects/${subject}/lessons`
+      : `/subjects/${subject}/lessons`;
     
-    console.log('Navigating to lessons:', lessonsPath);
+    console.log('Navigating to lessons for regeneration:', lessonsPath);
     navigate(lessonsPath);
   };
 
@@ -236,17 +323,52 @@ const SurveyResults = () => {
         </div>
       )}
 
+      {/* Regeneration Notice */}
+      {needsRegeneration && (
+        <div className="card">
+          <div className="bg-orange-50 border-l-4 border-orange-400 p-4 rounded-r-lg">
+            <div className="flex items-center">
+              <svg className="w-6 h-6 text-orange-400 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+              </svg>
+              <div>
+                <h3 className="text-lg font-medium text-orange-800">Updated Assessment Detected</h3>
+                <p className="text-orange-700 mt-1">
+                  You've retaken the assessment since your learning content was generated. 
+                  We recommend regenerating your personalized lessons to match your updated skill level.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Action Buttons */}
       <div className="card">
         <div className="flex flex-col sm:flex-row gap-4 justify-center">
           <button
             onClick={handleStartLearning}
-            className="btn-primary flex items-center justify-center"
+            className={`flex items-center justify-center ${
+              needsRegeneration 
+                ? 'bg-orange-600 hover:bg-orange-700 text-white px-6 py-3 rounded-lg font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2' 
+                : 'btn-primary'
+            }`}
           >
-            <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-            </svg>
-            Start Learning Path
+            {needsRegeneration ? (
+              <>
+                <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                Regenerate Learning Content
+              </>
+            ) : (
+              <>
+                <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                </svg>
+                Start Learning Path
+              </>
+            )}
           </button>
           <button
             onClick={handleRetakeAssessment}
@@ -257,20 +379,64 @@ const SurveyResults = () => {
             </svg>
             Retake Assessment
           </button>
+          
+          {/* Force Regeneration Button - always show for therapy subject */}
+          <button
+            onClick={() => {
+              // Force regeneration by navigating with a special flag
+              const lessonsPath = userId 
+                ? `/users/${userId}/subjects/${subject}/lessons?forceRegeneration=true`
+                : `/subjects/${subject}/lessons?forceRegeneration=true`;
+              console.log('Force regeneration clicked, navigating to:', lessonsPath);
+              navigate(lessonsPath);
+            }}
+            className="bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-lg font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 flex items-center justify-center"
+            title="Force regeneration of learning content with updated prompts"
+          >
+            <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1-1H8a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+              Force Regenerate Content
+            </button>
         </div>
       </div>
 
       {/* Debug Info (Development Only) */}
-      {process.env.NODE_ENV === 'development' && results && (
+      {process.env.NODE_ENV === 'development' && (
         <div className="card">
           <details className="bg-gray-100 rounded-lg p-4">
             <summary className="cursor-pointer text-sm font-medium text-gray-700">
               Debug Info (Development Only)
             </summary>
-            <div className="mt-4 text-xs">
-              <pre className="whitespace-pre-wrap text-gray-600">
-                {JSON.stringify(results, null, 2)}
-              </pre>
+            <div className="mt-4 text-xs space-y-2">
+              <div>
+                <strong>Component State:</strong>
+                <pre className="whitespace-pre-wrap text-gray-600">
+                  {JSON.stringify({
+                    needsRegeneration,
+                    hasLessonInfo: !!lessonInfo,
+                    lessonCount: lessonInfo?.lessons?.length || 0,
+                    userId,
+                    subject
+                  }, null, 2)}
+                </pre>
+              </div>
+              {results && (
+                <div>
+                  <strong>Survey Results:</strong>
+                  <pre className="whitespace-pre-wrap text-gray-600">
+                    {JSON.stringify(results, null, 2)}
+                  </pre>
+                </div>
+              )}
+              {lessonInfo && (
+                <div>
+                  <strong>Lesson Info:</strong>
+                  <pre className="whitespace-pre-wrap text-gray-600">
+                    {JSON.stringify(lessonInfo, null, 2)}
+                  </pre>
+                </div>
+              )}
             </div>
           </details>
         </div>

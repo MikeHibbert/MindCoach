@@ -402,12 +402,12 @@ class ComprehensiveIntegrationTester:
     def test_data_persistence(self):
         """Test data persistence across requests"""
         # Verify user still exists
-        response = requests.get(f"{self.backend_url}/api/users/{self.test_user_id}/subscriptions")
-        if response.status_code not in [200, 404]:  # 404 is acceptable if no subscriptions
+        response = requests.get(f"{self.backend_url}/api/users/{self.test_user_id}")
+        if response.status_code != 200:
             raise Exception(f"User data persistence check failed: {response.status_code}")
         
         # Verify subject selection persists
-        response = requests.get(f"{self.backend_url}/api/users/{self.test_user_id}/subjects/{self.test_subject}/status")
+        response = requests.get(f"{self.backend_url}/api/users/{self.test_user_id}/subjects/{self.test_subject}")
         if response.status_code != 200:
             raise Exception("Subject selection not persisted")
         

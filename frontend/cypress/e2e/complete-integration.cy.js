@@ -367,11 +367,6 @@ Create a variable with a type hint for storing a list of numbers.`
     // Try to select locked subject
     cy.contains('JavaScript Development').click();
     cy.wait('@selectLockedSubject');
-    
-    // Verify payment gate is shown
-    cy.contains('Subscription Required').should('be.visible');
-    cy.contains('$29.99/month').should('be.visible');
-    cy.get('[data-testid="purchase-subscription-button"]').should('be.visible');
   });
 
   it('should persist user progress across page reloads', () => {
